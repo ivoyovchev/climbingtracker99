@@ -89,19 +89,22 @@ struct HomeView: View {
     }
     
     private var weightProgress: Double? {
-        guard let current = currentWeight, userGoals.targetWeight > 0 else { return nil }
+        guard let current = currentWeight, 
+              let starting = userGoals.startingWeight,
+              userGoals.targetWeight > 0 else { return nil }
+        
         // If current weight is higher than target, we want to lose weight
         if current > userGoals.targetWeight {
-            // Progress is 1.0 when we reach target, 0.0 when we're at current
-            return 1.0 - ((current - userGoals.targetWeight) / current)
+            // Progress is 1.0 when we reach target, 0.0 when we're at starting weight
+            return 1.0 - ((current - userGoals.targetWeight) / (starting - userGoals.targetWeight))
         } else {
-            // For weight gain, progress is current/target
-            return current / userGoals.targetWeight
+            // For weight gain, progress is (current - starting) / (target - starting)
+            return (current - starting) / (userGoals.targetWeight - starting)
         }
     }
     
     private func updateWidgetData() {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.APP_GROUP_IDENTIFIER) else {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
             print("Failed to get container URL")
             return
         }
@@ -122,11 +125,25 @@ struct HomeView: View {
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
         let recentTrainings = trainings.filter { $0.date >= sevenDaysAgo }.count
         
+        // Calculate weight progress for widget
+        var weightProgress: Double = 0
+        if let current = currentWeight,
+           let starting = userGoals.startingWeight,
+           userGoals.targetWeight > 0 {
+            if current > userGoals.targetWeight {
+                weightProgress = 1.0 - ((current - userGoals.targetWeight) / (starting - userGoals.targetWeight))
+            } else {
+                weightProgress = (current - starting) / (userGoals.targetWeight - starting)
+            }
+        }
+        
         let data = [
             "trainingsLast7Days": recentTrainings,
             "targetTrainingsPerWeek": userGoals.targetTrainingsPerWeek,
             "currentWeight": currentWeight ?? 0,
-            "targetWeight": userGoals.targetWeight
+            "targetWeight": userGoals.targetWeight,
+            "startingWeight": userGoals.startingWeight ?? 0,
+            "weightProgress": weightProgress
         ] as [String : Any]
         
         do {
@@ -311,6 +328,7 @@ struct GoalsEditView: View {
     
     @State private var targetTrainings: Int
     @State private var targetWeight: Double
+    @State private var startingWeight: Double?
     
     let goals: Goals
     
@@ -318,6 +336,7 @@ struct GoalsEditView: View {
         self.goals = goals
         _targetTrainings = State(initialValue: goals.targetTrainingsPerWeek)
         _targetWeight = State(initialValue: goals.targetWeight)
+        _startingWeight = State(initialValue: goals.startingWeight)
     }
     
     var body: some View {
@@ -328,6 +347,15 @@ struct GoalsEditView: View {
                 }
                 
                 Section(header: Text("Weight Goals")) {
+                    HStack {
+                        Text("Starting Weight")
+                        Spacer()
+                        TextField("Weight", value: $startingWeight, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                        Text("kg")
+                    }
+                    
                     HStack {
                         Text("Target Weight")
                         Spacer()
@@ -350,6 +378,7 @@ struct GoalsEditView: View {
                     Button("Save") {
                         goals.targetTrainingsPerWeek = targetTrainings
                         goals.targetWeight = targetWeight
+                        goals.startingWeight = startingWeight
                         goals.lastUpdated = Date()
                         dismiss()
                     }
@@ -476,7 +505,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text(SharedConstants.APP_VERSION)
+                        Text("1.0.2")
                             .foregroundColor(.gray)
                     }
                 }
