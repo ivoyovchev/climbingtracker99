@@ -54,6 +54,7 @@ struct HomeView: View {
     @Query private var goals: [Goals]
     
     @State private var showingGoalsSheet = false
+    @State private var animateStats = false
     
     private var currentWeight: Double? {
         weightEntries.sorted(by: { $0.date > $1.date }).first?.weight
@@ -72,6 +73,45 @@ struct HomeView: View {
     private var trainingsLast6Months: Int {
         let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date())!
         return trainings.filter { $0.date >= sixMonthsAgo }.count
+    }
+    
+    private var totalTrainingTime: Int {
+        trainings.reduce(0) { $0 + $1.duration }
+    }
+    
+    private var averageTrainingTime: Double {
+        guard !trainings.isEmpty else { return 0 }
+        return Double(totalTrainingTime) / Double(trainings.count)
+    }
+    
+    private var exerciseFocusDistribution: [(focus: TrainingFocus, count: Int)] {
+        let allExercises = trainings.flatMap { $0.recordedExercises }
+        let counts = Dictionary(grouping: allExercises) { exercise in
+            exercise.exercise.focus ?? .strength
+        }
+        .mapValues { $0.count }
+        return TrainingFocus.allCases.map { focus in
+            (focus: focus, count: counts[focus] ?? 0)
+        }
+    }
+    
+    private var exerciseTypeDistribution: [(type: ExerciseType, count: Int)] {
+        let allExercises = trainings.flatMap { $0.recordedExercises }
+        let counts = Dictionary(grouping: allExercises) { exercise in
+            exercise.exercise.type
+        }
+        .mapValues { $0.count }
+        return ExerciseType.allCases.map { type in
+            (type: type, count: counts[type] ?? 0)
+        }
+    }
+    
+    private var trainingLocationDistribution: [(location: TrainingLocation, count: Int)] {
+        let counts = Dictionary(grouping: trainings, by: \.location)
+            .mapValues { $0.count }
+        return TrainingLocation.allCases.map { location in
+            (location: location, count: counts[location] ?? 0)
+        }
     }
     
     private var userGoals: Goals {
@@ -93,12 +133,9 @@ struct HomeView: View {
               let starting = userGoals.startingWeight,
               userGoals.targetWeight > 0 else { return nil }
         
-        // If current weight is higher than target, we want to lose weight
         if current > userGoals.targetWeight {
-            // Progress is 1.0 when we reach target, 0.0 when we're at starting weight
             return 1.0 - ((current - userGoals.targetWeight) / (starting - userGoals.targetWeight))
         } else {
-            // For weight gain, progress is (current - starting) / (target - starting)
             return (current - starting) / (userGoals.targetWeight - starting)
         }
     }
@@ -140,9 +177,9 @@ struct HomeView: View {
         let data = [
             "trainingsLast7Days": recentTrainings,
             "targetTrainingsPerWeek": userGoals.targetTrainingsPerWeek,
-            "currentWeight": currentWeight ?? 0,
+            "currentWeight": currentWeight ?? 0.0,
             "targetWeight": userGoals.targetWeight,
-            "startingWeight": userGoals.startingWeight ?? 0,
+            "startingWeight": userGoals.startingWeight ?? 0.0,
             "weightProgress": weightProgress
         ] as [String : Any]
         
@@ -164,40 +201,45 @@ struct HomeView: View {
                 TabHeaderView(title: "Dashboard") {
                     Button(action: { showingGoalsSheet = true }) {
                         Image(systemName: "target")
-                            .font(.system(size: 24))
+                            .foregroundColor(.blue)
                     }
                 }
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Training Stats
-                        VStack(alignment: .leading, spacing: 10) {
+                        // Training Overview Card
+                        VStack(alignment: .leading, spacing: 15) {
                             HStack {
-                                Text("Training")
+                                Text("Training Overview")
                                     .font(.title2)
                                     .bold()
                                 Spacer()
                             }
                             
-                            // Training Progress Bar
-                            VStack(alignment: .leading, spacing: 5) {
+                            // Weekly Progress
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Text("This Week")
+                                        .font(.headline)
                                     Spacer()
                                     Text("\(trainingsLast7Days)/\(userGoals.targetTrainingsPerWeek)")
+                                        .font(.headline)
                                 }
-                                .font(.subheadline)
                                 
                                 GeometryReader { geometry in
                                     ZStack(alignment: .leading) {
                                         Rectangle()
-                                            .frame(width: geometry.size.width, height: 10)
+                                            .frame(width: geometry.size.width, height: 12)
                                             .opacity(0.3)
                                             .foregroundColor(.gray)
+                                            .cornerRadius(6)
                                         
                                         Rectangle()
-                                            .frame(width: min(CGFloat(trainingProgress) * geometry.size.width, geometry.size.width), height: 10)
+                                            .frame(width: min(CGFloat(trainingProgress) * geometry.size.width, geometry.size.width), height: 12)
                                             .foregroundColor(trainingProgress >= 1.0 ? .blue : .green)
+                                            .cornerRadius(6)
+                                            .scaleEffect(x: animateStats ? 1 : 0, anchor: .leading)
+                                            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateStats)
                                         
                                         if trainingProgress >= 1.0 {
                                             Image(systemName: "trophy.fill")
@@ -205,37 +247,178 @@ struct HomeView: View {
                                                 .offset(x: min(CGFloat(trainingProgress) * geometry.size.width - 20, geometry.size.width - 20))
                                         }
                                     }
-                                    .cornerRadius(5)
                                 }
-                                .frame(height: 10)
+                                .frame(height: 12)
                             }
                             
-                            // Training Stats
-                            HStack {
-                                StatBox(title: "Last 30 Days", value: "\(trainingsLast30Days)")
-                                StatBox(title: "Last 6 Months", value: "\(trainingsLast6Months)")
+                            // Training Stats Grid
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
+                                StatCard(
+                                    title: "Total Time",
+                                    value: "\(totalTrainingTime) min",
+                                    icon: "clock.fill",
+                                    color: .orange
+                                )
+                                
+                                StatCard(
+                                    title: "Avg. Duration",
+                                    value: String(format: "%.0f min", averageTrainingTime),
+                                    icon: "timer",
+                                    color: .purple
+                                )
+                                
+                                StatCard(
+                                    title: "Last 30 Days",
+                                    value: "\(trainingsLast30Days)",
+                                    icon: "calendar",
+                                    color: .blue
+                                )
+                                
+                                StatCard(
+                                    title: "Last 6 Months",
+                                    value: "\(trainingsLast6Months)",
+                                    icon: "chart.bar.fill",
+                                    color: .green
+                                )
                             }
                         }
                         .padding()
                         .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
                         
-                        // Weight Stats
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("Weight")
-                                    .font(.title2)
-                                    .bold()
-                                Spacer()
-                                Button(action: { showingGoalsSheet = true }) {
-                                    Image(systemName: "target")
+                        // Exercise Focus Distribution
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Exercise Focus")
+                                .font(.title2)
+                                .bold()
+                            
+                            VStack(spacing: 10) {
+                                ForEach(exerciseFocusDistribution, id: \.focus) { item in
+                                    HStack {
+                                        Text(item.focus.rawValue)
+                                            .foregroundColor(item.focus.color)
+                                        Spacer()
+                                        Text("\(item.count)")
+                                            .font(.headline)
+                                    }
+                                    .padding(.vertical, 5)
+                                    
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            Rectangle()
+                                                .frame(width: geometry.size.width, height: 8)
+                                                .opacity(0.3)
+                                                .foregroundColor(.gray)
+                                                .cornerRadius(4)
+                                            
+                                            Rectangle()
+                                                .frame(width: animateStats ? geometry.size.width * CGFloat(item.count) / CGFloat(exerciseFocusDistribution.reduce(0) { $0 + $1.count }) : 0, height: 8)
+                                                .foregroundColor(item.focus.color)
+                                                .cornerRadius(4)
+                                                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(item.focus.rawValue.count) * 0.1), value: animateStats)
+                                        }
+                                    }
+                                    .frame(height: 8)
                                 }
                             }
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        
+                        // Exercise Type Distribution
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Exercise Types")
+                                .font(.title2)
+                                .bold()
                             
-                            if let currentWeight = currentWeight {
-                                // Weight Progress
-                                VStack(alignment: .leading, spacing: 5) {
+                            VStack(spacing: 10) {
+                                ForEach(exerciseTypeDistribution, id: \.type) { item in
+                                    HStack {
+                                        Text(item.type.rawValue)
+                                        Spacer()
+                                        Text("\(item.count)")
+                                            .font(.headline)
+                                    }
+                                    .padding(.vertical, 5)
+                                    
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            Rectangle()
+                                                .frame(width: geometry.size.width, height: 8)
+                                                .opacity(0.3)
+                                                .foregroundColor(.gray)
+                                                .cornerRadius(4)
+                                            
+                                            Rectangle()
+                                                .frame(width: animateStats ? geometry.size.width * CGFloat(item.count) / CGFloat(exerciseTypeDistribution.reduce(0) { $0 + $1.count }) : 0, height: 8)
+                                                .foregroundColor(.blue)
+                                                .cornerRadius(4)
+                                                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(item.type.rawValue.count) * 0.1), value: animateStats)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        
+                        // Training Location Distribution
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Training Locations")
+                                .font(.title2)
+                                .bold()
+                            
+                            VStack(spacing: 10) {
+                                ForEach(trainingLocationDistribution, id: \.location) { item in
+                                    HStack {
+                                        Text(item.location.rawValue)
+                                        Spacer()
+                                        Text("\(item.count)")
+                                            .font(.headline)
+                                    }
+                                    .padding(.vertical, 5)
+                                    
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
+                                            Rectangle()
+                                                .frame(width: geometry.size.width, height: 8)
+                                                .opacity(0.3)
+                                                .foregroundColor(.gray)
+                                                .cornerRadius(4)
+                                            
+                                            Rectangle()
+                                                .frame(width: animateStats ? geometry.size.width * CGFloat(item.count) / CGFloat(trainings.count) : 0, height: 8)
+                                                .foregroundColor(.blue)
+                                                .cornerRadius(4)
+                                                .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(Double(item.location.rawValue.count) * 0.1), value: animateStats)
+                                        }
+                                    }
+                                    .frame(height: 8)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(15)
+                        .shadow(radius: 5)
+                        
+                        // Weight Progress Card
+                        if let currentWeight = currentWeight {
+                            VStack(alignment: .leading, spacing: 15) {
+                                HStack {
+                                    Text("Weight Progress")
+                                        .font(.title2)
+                                        .bold()
+                                    Spacer()
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Text("Current: \(String(format: "%.1f", currentWeight)) kg")
                                         Spacer()
@@ -243,19 +426,23 @@ struct HomeView: View {
                                             Text("Target: \(String(format: "%.1f", userGoals.targetWeight)) kg")
                                         }
                                     }
-                                    .font(.subheadline)
+                                    .font(.headline)
                                     
                                     if userGoals.targetWeight > 0, let progress = weightProgress {
                                         GeometryReader { geometry in
                                             ZStack(alignment: .leading) {
                                                 Rectangle()
-                                                    .frame(width: geometry.size.width, height: 10)
+                                                    .frame(width: geometry.size.width, height: 12)
                                                     .opacity(0.3)
                                                     .foregroundColor(.gray)
+                                                    .cornerRadius(6)
                                                 
                                                 Rectangle()
-                                                    .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 10)
+                                                    .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 12)
                                                     .foregroundColor(progress >= 1.0 ? .blue : .green)
+                                                    .cornerRadius(6)
+                                                    .scaleEffect(x: animateStats ? 1 : 0, anchor: .leading)
+                                                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateStats)
                                                 
                                                 if progress >= 1.0 {
                                                     Image(systemName: "trophy.fill")
@@ -263,20 +450,16 @@ struct HomeView: View {
                                                         .offset(x: min(CGFloat(progress) * geometry.size.width - 20, geometry.size.width - 20))
                                                 }
                                             }
-                                            .cornerRadius(5)
                                         }
-                                        .frame(height: 10)
+                                        .frame(height: 12)
                                     }
                                 }
-                            } else {
-                                Text("No weight data available")
-                                    .foregroundColor(.gray)
                             }
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(15)
+                            .shadow(radius: 5)
                         }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
                     }
                     .padding()
                 }
@@ -284,6 +467,9 @@ struct HomeView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingGoalsSheet) {
                 GoalsEditView(goals: userGoals)
+            }
+            .onAppear {
+                animateStats = true
             }
             .onChange(of: trainings) { oldValue, newValue in
                 print("Trainings changed - Count: \(newValue.count)")
@@ -301,24 +487,31 @@ struct HomeView: View {
     }
 }
 
-struct StatBox: View {
+struct StatCard: View {
     let title: String
     let value: String
+    let icon: String
+    let color: Color
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+            
             Text(value)
-                .font(.title3)
+                .font(.title2)
                 .bold()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(10)
-        .shadow(radius: 1)
+        .shadow(radius: 2)
     }
 }
 
@@ -408,17 +601,6 @@ struct HealthView: View {
                     }
                 }
                 
-                Button(action: { showingAddWeight = true }) {
-                    Label("Add Weight", systemImage: "plus.circle.fill")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal)
-                
                 WeightGraphView(entries: sortedEntries)
                     .frame(height: 200)
                     .padding()
@@ -505,7 +687,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.2")
+                        Text("1.0.3")
                             .foregroundColor(.gray)
                     }
                 }
