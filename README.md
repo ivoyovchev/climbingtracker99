@@ -2,7 +2,7 @@
 
 A comprehensive iOS/macOS app for tracking climbing training progress, health metrics, and nutrition.
 
-## Version 1.0.2
+## Version 1.0.3
 
 ### Features
 - Training tracking with customizable exercises
@@ -13,6 +13,8 @@ A comprehensive iOS/macOS app for tracking climbing training progress, health me
 - Data visualization with charts and progress bars
 
 ### Recent Updates
+- Improved exercise recording interface
+- Enhanced grade selection for Limit Bouldering
 - Consistent header layout across all tabs
 - Centered and larger titles
 - Improved spacing and visual hierarchy
