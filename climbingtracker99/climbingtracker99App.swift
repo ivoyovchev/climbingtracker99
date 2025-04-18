@@ -8,59 +8,25 @@
 import SwiftUI
 import SwiftData
 
-let APP_VERSION = "1.0.0"
-
 @main
 struct climbingtracker99App: App {
-    let container: ModelContainer
+    let modelContainer: ModelContainer
     
     init() {
         do {
-            let schema = Schema([
-                WeightEntry.self,
-                UserSettings.self,
-                Item.self,
-                Exercise.self,
-                Training.self,
-                Goals.self,
-                Media.self
-            ])
-            
-            let modelConfiguration = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                allowsSave: true,
-                groupContainer: .identifier("group.com.tornado-studios.climbingtracker99")
-            )
-            
-            container = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            
-            // Ensure default exercises exist
-            let descriptor = FetchDescriptor<Exercise>()
-            let exercises = try container.mainContext.fetch(descriptor)
-            
-            if exercises.isEmpty {
-                // Create default exercises
-                let defaultExercises = [
-                    Exercise(type: .hangboarding),
-                    Exercise(type: .repeaters),
-                    Exercise(type: .limitBouldering)
-                ]
-                
-                for exercise in defaultExercises {
-                    container.mainContext.insert(exercise)
-                }
-            }
+            modelContainer = try ModelContainer(for: WeightEntry.self, UserSettings.self, Item.self)
         } catch {
-            fatalError("Could not configure SwiftData container: \(error)")
+            fatalError("Could not initialize ModelContainer: \(error)")
         }
     }
+    
+    let APP_VERSION = "1.0.1"
     
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(container)
+        .modelContainer(modelContainer)
     }
 }
 

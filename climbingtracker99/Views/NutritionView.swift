@@ -9,24 +9,26 @@ struct NutritionView: View {
     
     var body: some View {
         NavigationView {
-            List {
-                ForEach(nutritionEntries) { entry in
-                    NutritionEntryRow(entry: entry)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedEntry = entry
-                        }
-                }
-                .onDelete(perform: deleteEntries)
-            }
-            .navigationTitle("Nutrition")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+            VStack(spacing: 0) {
+                TabHeaderView(title: "Nutrition") {
                     Button(action: { showingAddEntry = true }) {
-                        Image(systemName: "plus")
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 24))
                     }
                 }
+                
+                List {
+                    ForEach(nutritionEntries) { entry in
+                        NutritionEntryRow(entry: entry)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedEntry = entry
+                            }
+                    }
+                    .onDelete(perform: deleteEntries)
+                }
             }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddEntry) {
                 NutritionEntryEditView()
             }

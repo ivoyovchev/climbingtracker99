@@ -24,14 +24,19 @@ struct ContentView: View {
                     Label("Training", systemImage: "figure.climbing")
                 }
             
-            NutritionView()
+            MomentsView()
                 .tabItem {
-                    Label("Nutrition", systemImage: "fork.knife")
+                    Label("Moments", systemImage: "photo.on.rectangle")
                 }
             
             HealthView()
                 .tabItem {
                     Label("Health", systemImage: "heart")
+                }
+            
+            NutritionView()
+                .tabItem {
+                    Label("Nutrition", systemImage: "fork.knife")
                 }
             
             SettingsView()
@@ -138,122 +143,128 @@ struct HomeView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Training Stats
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Training")
-                                .font(.title2)
-                                .bold()
-                            Spacer()
-                            Button(action: { showingGoalsSheet = true }) {
-                                Image(systemName: "target")
-                            }
-                        }
-                        
-                        // Training Progress Bar
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack {
-                                Text("This Week")
-                                Spacer()
-                                Text("\(trainingsLast7Days)/\(userGoals.targetTrainingsPerWeek)")
-                            }
-                            .font(.subheadline)
-                            
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    Rectangle()
-                                        .frame(width: geometry.size.width, height: 10)
-                                        .opacity(0.3)
-                                        .foregroundColor(.gray)
-                                    
-                                    Rectangle()
-                                        .frame(width: min(CGFloat(trainingProgress) * geometry.size.width, geometry.size.width), height: 10)
-                                        .foregroundColor(trainingProgress >= 1.0 ? .blue : .green)
-                                    
-                                    if trainingProgress >= 1.0 {
-                                        Image(systemName: "trophy.fill")
-                                            .foregroundColor(.yellow)
-                                            .offset(x: min(CGFloat(trainingProgress) * geometry.size.width - 20, geometry.size.width - 20))
-                                    }
-                                }
-                                .cornerRadius(5)
-                            }
-                            .frame(height: 10)
-                        }
-                        
-                        // Training Stats
-                        HStack {
-                            StatBox(title: "Last 30 Days", value: "\(trainingsLast30Days)")
-                            StatBox(title: "Last 6 Months", value: "\(trainingsLast6Months)")
-                        }
+            VStack(spacing: 0) {
+                TabHeaderView(title: "Dashboard") {
+                    Button(action: { showingGoalsSheet = true }) {
+                        Image(systemName: "target")
+                            .font(.system(size: 24))
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(10)
-                    .shadow(radius: 2)
-                    
-                    // Weight Stats
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Weight")
-                                .font(.title2)
-                                .bold()
-                            Spacer()
-                            Button(action: { showingGoalsSheet = true }) {
-                                Image(systemName: "target")
+                }
+                
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Training Stats
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Training")
+                                    .font(.title2)
+                                    .bold()
+                                Spacer()
                             }
-                        }
-                        
-                        if let currentWeight = currentWeight {
-                            // Weight Progress
+                            
+                            // Training Progress Bar
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack {
-                                    Text("Current: \(String(format: "%.1f", currentWeight)) kg")
+                                    Text("This Week")
                                     Spacer()
-                                    if userGoals.targetWeight > 0 {
-                                        Text("Target: \(String(format: "%.1f", userGoals.targetWeight)) kg")
-                                    }
+                                    Text("\(trainingsLast7Days)/\(userGoals.targetTrainingsPerWeek)")
                                 }
                                 .font(.subheadline)
                                 
-                                if userGoals.targetWeight > 0, let progress = weightProgress {
-                                    GeometryReader { geometry in
-                                        ZStack(alignment: .leading) {
-                                            Rectangle()
-                                                .frame(width: geometry.size.width, height: 10)
-                                                .opacity(0.3)
-                                                .foregroundColor(.gray)
-                                            
-                                            Rectangle()
-                                                .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 10)
-                                                .foregroundColor(progress >= 1.0 ? .blue : .green)
-                                            
-                                            if progress >= 1.0 {
-                                                Image(systemName: "trophy.fill")
-                                                    .foregroundColor(.yellow)
-                                                    .offset(x: min(CGFloat(progress) * geometry.size.width - 20, geometry.size.width - 20))
-                                            }
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle()
+                                            .frame(width: geometry.size.width, height: 10)
+                                            .opacity(0.3)
+                                            .foregroundColor(.gray)
+                                        
+                                        Rectangle()
+                                            .frame(width: min(CGFloat(trainingProgress) * geometry.size.width, geometry.size.width), height: 10)
+                                            .foregroundColor(trainingProgress >= 1.0 ? .blue : .green)
+                                        
+                                        if trainingProgress >= 1.0 {
+                                            Image(systemName: "trophy.fill")
+                                                .foregroundColor(.yellow)
+                                                .offset(x: min(CGFloat(trainingProgress) * geometry.size.width - 20, geometry.size.width - 20))
                                         }
-                                        .cornerRadius(5)
                                     }
-                                    .frame(height: 10)
+                                    .cornerRadius(5)
+                                }
+                                .frame(height: 10)
+                            }
+                            
+                            // Training Stats
+                            HStack {
+                                StatBox(title: "Last 30 Days", value: "\(trainingsLast30Days)")
+                                StatBox(title: "Last 6 Months", value: "\(trainingsLast6Months)")
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .shadow(radius: 2)
+                        
+                        // Weight Stats
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Weight")
+                                    .font(.title2)
+                                    .bold()
+                                Spacer()
+                                Button(action: { showingGoalsSheet = true }) {
+                                    Image(systemName: "target")
                                 }
                             }
-                        } else {
-                            Text("No weight data available")
-                                .foregroundColor(.gray)
+                            
+                            if let currentWeight = currentWeight {
+                                // Weight Progress
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack {
+                                        Text("Current: \(String(format: "%.1f", currentWeight)) kg")
+                                        Spacer()
+                                        if userGoals.targetWeight > 0 {
+                                            Text("Target: \(String(format: "%.1f", userGoals.targetWeight)) kg")
+                                        }
+                                    }
+                                    .font(.subheadline)
+                                    
+                                    if userGoals.targetWeight > 0, let progress = weightProgress {
+                                        GeometryReader { geometry in
+                                            ZStack(alignment: .leading) {
+                                                Rectangle()
+                                                    .frame(width: geometry.size.width, height: 10)
+                                                    .opacity(0.3)
+                                                    .foregroundColor(.gray)
+                                                
+                                                Rectangle()
+                                                    .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 10)
+                                                    .foregroundColor(progress >= 1.0 ? .blue : .green)
+                                                
+                                                if progress >= 1.0 {
+                                                    Image(systemName: "trophy.fill")
+                                                        .foregroundColor(.yellow)
+                                                        .offset(x: min(CGFloat(progress) * geometry.size.width - 20, geometry.size.width - 20))
+                                                }
+                                            }
+                                            .cornerRadius(5)
+                                        }
+                                        .frame(height: 10)
+                                    }
+                                }
+                            } else {
+                                Text("No weight data available")
+                                    .foregroundColor(.gray)
+                            }
                         }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(10)
+                        .shadow(radius: 2)
                     }
                     .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(10)
-                    .shadow(radius: 2)
                 }
-                .padding()
             }
-            .navigationTitle("Dashboard")
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingGoalsSheet) {
                 GoalsEditView(goals: userGoals)
             }
@@ -361,6 +372,13 @@ struct HealthView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
+                TabHeaderView(title: "Health") {
+                    Button(action: { showingAddWeight = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 24))
+                    }
+                }
+                
                 Button(action: { showingAddWeight = true }) {
                     Label("Add Weight", systemImage: "plus.circle.fill")
                         .font(.headline)
@@ -401,7 +419,7 @@ struct HealthView: View {
                     .onDelete(perform: deleteEntries)
                 }
             }
-            .navigationTitle("Health")
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddWeight) {
                 WeightEntryView()
             }
@@ -450,15 +468,6 @@ struct SettingsView: View {
                         HStack {
                             Image(systemName: "figure.climbing")
                             Text("Exercises")
-                        }
-                    }
-                }
-                
-                Section(header: Text("Nutrition")) {
-                    NavigationLink(destination: MealsView()) {
-                        HStack {
-                            Image(systemName: "fork.knife")
-                            Text("Meals")
                         }
                     }
                 }

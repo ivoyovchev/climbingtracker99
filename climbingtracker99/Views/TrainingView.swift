@@ -31,24 +31,18 @@ public struct TrainingView: View {
     public var body: some View {
         NavigationView {
             VStack(spacing: 20) {
+                TabHeaderView(title: "Training") {
+                    Button(action: { showingAddTraining = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 24))
+                    }
+                }
+                
                 ExerciseStatsView(trainings: trainings)
                 
                 trainingList
             }
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack {
-                        Text("Training")
-                            .font(.system(size: 24, weight: .bold))
-                        Spacer()
-                        Button(action: { showingAddTraining = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 24))
-                        }
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddTraining) {
                 TrainingEditView()
             }
