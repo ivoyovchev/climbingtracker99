@@ -8,6 +8,8 @@
 import SwiftUI
 import SwiftData
 
+let APP_VERSION = "1.0.0"
+
 @main
 struct climbingtracker99App: App {
     let container: ModelContainer
@@ -20,10 +22,35 @@ struct climbingtracker99App: App {
                 Item.self,
                 Exercise.self,
                 Training.self,
-                Goals.self
+                Goals.self,
+                Media.self
             ])
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            
+            let modelConfiguration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                allowsSave: true,
+                groupContainer: .identifier("group.com.tornado-studios.climbingtracker99")
+            )
+            
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            
+            // Ensure default exercises exist
+            let descriptor = FetchDescriptor<Exercise>()
+            let exercises = try container.mainContext.fetch(descriptor)
+            
+            if exercises.isEmpty {
+                // Create default exercises
+                let defaultExercises = [
+                    Exercise(type: .hangboarding),
+                    Exercise(type: .repeaters),
+                    Exercise(type: .limitBouldering)
+                ]
+                
+                for exercise in defaultExercises {
+                    container.mainContext.insert(exercise)
+                }
+            }
         } catch {
             fatalError("Could not configure SwiftData container: \(error)")
         }

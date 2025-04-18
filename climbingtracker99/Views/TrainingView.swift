@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 // Add color extension for TrainingFocus
 extension TrainingFocus {
@@ -127,10 +128,17 @@ struct TrainingRow: View {
                     }
                 }
                 
-                if !training.notes.isEmpty {
-                    Text(training.notes)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                // Media count
+                if !training.media.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        Text("\(training.media.count)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.vertical, 4)
                 }
             }
             .padding(.leading, 12)
@@ -155,6 +163,11 @@ struct TrainingEditView: View {
     @State private var selectedExercises: [Exercise] = []
     @State private var recordedExercises: [RecordedExercise] = []
     @State private var notes: String = ""
+    @State private var selectedMedia: [Media] = []
+    @State private var showingImagePicker = false
+    @State private var showingVideoPicker = false
+    @State private var selectedImageItems: [PhotosPickerItem] = []
+    @State private var selectedVideoItem: PhotosPickerItem?
     
     private let columns = [
         GridItem(.flexible()),
@@ -222,67 +235,34 @@ struct TrainingEditView: View {
                 if !recordedExercises.isEmpty {
                     Section(header: Text("Completed Exercises")) {
                         ForEach(recordedExercises) { recordedExercise in
-                            NavigationLink(destination: ExerciseRecordView(recordedExercise: recordedExercise)) {
-                                HStack(spacing: 12) {
+                            NavigationLink {
+                                ExerciseRecordView(recordedExercise: recordedExercise)
+                            } label: {
+                                HStack {
                                     Image(recordedExercise.exercise.type.imageName)
                                         .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 60, height: 45)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 30, height: 30)
                                     
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(recordedExercise.exercise.type.rawValue)
-                                            .font(.system(size: 14, weight: .semibold))
-                                        
-                                        switch recordedExercise.exercise.type {
-                                        case .hangboarding:
-                                            if let grip = recordedExercise.gripType,
-                                               let duration = recordedExercise.duration,
-                                               let weight = recordedExercise.addedWeight {
-                                                Text("Grip: \(grip.rawValue), \(duration)s, +\(weight)kg")
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        case .repeaters:
-                                            if let duration = recordedExercise.duration,
-                                               let reps = recordedExercise.repetitions,
-                                               let sets = recordedExercise.sets {
-                                                Text("\(duration)s × \(reps) reps × \(sets) sets")
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        case .limitBouldering:
-                                            if let grade = recordedExercise.grade,
-                                               let routes = recordedExercise.routes {
-                                                Text("\(grade) × \(routes) routes")
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                    }
+                                    Text(recordedExercise.exercise.type.rawValue)
+                                        .font(.headline)
                                     
                                     Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.secondary)
                                 }
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 4)
                             }
                         }
-                        .onDelete(perform: deleteExercises)
+                        .onDelete { indexSet in
+                            recordedExercises.remove(atOffsets: indexSet)
+                        }
                     }
                 }
                 
                 // Available Exercises section
                 Section(header: Text("Available Exercises")) {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(availableExercises, id: \.id) { exercise in
-                            Button(action: {
-                                withAnimation {
-                                    addExercise(exercise)
-                                }
-                            }) {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(availableExercises) { exercise in
+                            Button(action: { addExercise(exercise) }) {
                                 VStack(spacing: 8) {
                                     Image(exercise.type.imageName)
                                         .resizable()
@@ -315,6 +295,41 @@ struct TrainingEditView: View {
                     .padding(.horizontal)
                 }
                 
+                // Media Section
+                Section(header: Text("Media")) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(selectedMedia) { media in
+                                MediaThumbnail(media: media, onDelete: {
+                                    selectedMedia.removeAll { $0.id == media.id }
+                                })
+                            }
+                            
+                            PhotosPicker(selection: $selectedImageItems, matching: .images) {
+                                VStack {
+                                    Image(systemName: "photo.on.rectangle.angled")
+                                        .font(.system(size: 24))
+                                    Text("Add Photos")
+                                        .font(.caption)
+                                }
+                                .frame(width: 60, height: 60)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+                .onChange(of: selectedImageItems) { _, newItems in
+                    Task {
+                        for item in newItems {
+                            await handleMediaSelection(item)
+                        }
+                        selectedImageItems.removeAll()
+                    }
+                }
+                
+                // Notes section at the bottom
                 Section(header: Text("Notes")) {
                     TextEditor(text: $notes)
                         .frame(height: 100)
@@ -342,8 +357,34 @@ struct TrainingEditView: View {
                     focus = training.focus
                     recordedExercises = training.recordedExercises
                     notes = training.notes
+                    selectedMedia = training.media
                 }
             }
+        }
+    }
+    
+    private func handleMediaSelection(_ item: PhotosPickerItem) async {
+        do {
+            print("Starting media selection handling")
+            
+            // Get the data from the PhotosPicker item
+            if let data = try await item.loadTransferable(type: Data.self) {
+                print("Successfully loaded image data")
+                
+                // Create a new Media object with the image data
+                let media = Media(type: .image, imageData: data)
+                print("Created media object with image data")
+                
+                // Add the media to the selected media array
+                DispatchQueue.main.async {
+                    selectedMedia.append(media)
+                    print("Added media to selectedMedia array. New count: \(selectedMedia.count)")
+                }
+            } else {
+                print("Failed to load image data")
+            }
+        } catch {
+            print("Error handling media selection: \(error)")
         }
     }
     
@@ -355,6 +396,7 @@ struct TrainingEditView: View {
             training.focus = focus
             training.recordedExercises = recordedExercises
             training.notes = notes
+            training.media = Array(selectedMedia)
         } else {
             let newTraining = Training(
                 date: date,
@@ -362,15 +404,90 @@ struct TrainingEditView: View {
                 location: location,
                 focus: focus,
                 recordedExercises: recordedExercises,
-                notes: notes
+                notes: notes,
+                media: Array(selectedMedia)
             )
             modelContext.insert(newTraining)
         }
         dismiss()
     }
+}
+
+struct MediaThumbnail: View {
+    let media: Media
+    @State private var showingMediaViewer = false
+    let onDelete: () -> Void
     
-    private func deleteExercises(offsets: IndexSet) {
-        recordedExercises.remove(atOffsets: offsets)
+    var body: some View {
+        Group {
+            if let image = media.thumbnail {
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Image(systemName: "photo.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.gray)
+            }
+        }
+        .frame(width: 60, height: 60)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            ZStack {
+                Image(systemName: "photo.fill")
+                    .foregroundColor(.white)
+                    .padding(4)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Circle())
+                    .padding(4)
+                
+                // Delete button
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.white)
+                        .padding(4)
+                        .background(Color.black.opacity(0.5))
+                        .clipShape(Circle())
+                }
+                .padding(4)
+                .offset(x: 20, y: -20)
+            }
+        )
+        .onTapGesture {
+            showingMediaViewer = true
+        }
+        .sheet(isPresented: $showingMediaViewer) {
+            MediaViewerView(media: media)
+        }
+    }
+}
+
+struct MediaViewerView: View {
+    let media: Media
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            Group {
+                if let image = media.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .padding()
+                } else {
+                    Text("Unable to load media")
+                        .foregroundColor(.gray)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

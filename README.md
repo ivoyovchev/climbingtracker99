@@ -1,6 +1,14 @@
 # ClimbingTracker99
 
-A comprehensive iOS app for tracking climbing training progress, nutrition, and health metrics. Built with SwiftUI and SwiftData.
+A comprehensive iOS app for tracking climbing training sessions, health metrics, and nutrition.
+
+## Version 1.1
+
+### What's New
+- Improved media handling with local file storage
+- Enhanced UI for media display in training sessions
+- Fixed issues with duplicate media entries
+- Optimized performance for media loading and display
 
 ## Features
 

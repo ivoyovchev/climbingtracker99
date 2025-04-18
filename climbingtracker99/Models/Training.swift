@@ -98,14 +98,17 @@ final class Training {
     var focus: TrainingFocus
     var recordedExercises: [RecordedExercise]
     var notes: String
+    var media: [Media]
     
     init(date: Date = Date(), duration: Int = 60, location: TrainingLocation = .indoor, 
-         focus: TrainingFocus = .strength, recordedExercises: [RecordedExercise] = [], notes: String = "") {
+         focus: TrainingFocus = .strength, recordedExercises: [RecordedExercise] = [], 
+         notes: String = "", media: [Media] = []) {
         self.date = date
         self.duration = duration
         self.location = location
         self.focus = focus
         self.recordedExercises = recordedExercises
         self.notes = notes
+        self.media = media
     }
 } 

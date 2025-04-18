@@ -350,12 +350,12 @@ struct GoalsEditView: View {
 
 struct HealthView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var weightEntries: [WeightEntry] = []
+    @Query(sort: \WeightEntry.date, order: .reverse) private var weightEntries: [WeightEntry]
     @State private var showingAddWeight = false
     @State private var entryToEdit: WeightEntry?
     
     private var sortedEntries: [WeightEntry] {
-        weightEntries.sorted(by: { $0.date > $1.date })
+        weightEntries
     }
     
     var body: some View {
@@ -409,10 +409,6 @@ struct HealthView: View {
                 WeightEntryView(entry: entry)
             }
         }
-        .task {
-            let descriptor = FetchDescriptor<WeightEntry>()
-            weightEntries = (try? modelContext.fetch(descriptor)) ?? []
-        }
     }
     
     private func deleteEntries(offsets: IndexSet) {
@@ -464,6 +460,15 @@ struct SettingsView: View {
                             Image(systemName: "fork.knife")
                             Text("Meals")
                         }
+                    }
+                }
+                
+                Section(header: Text("About")) {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(APP_VERSION)
+                            .foregroundColor(.gray)
                     }
                 }
                 
