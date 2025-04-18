@@ -101,7 +101,7 @@ struct HomeView: View {
     }
     
     private func updateWidgetData() {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.APP_GROUP_IDENTIFIER) else {
             print("Failed to get container URL")
             return
         }
@@ -476,7 +476,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text(APP_VERSION)
+                        Text(Constants.APP_VERSION)
                             .foregroundColor(.gray)
                     }
                 }

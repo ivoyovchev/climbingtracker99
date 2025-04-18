@@ -10,68 +10,50 @@ import SwiftUI
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 79.2, targetWeight: 78.5)
+        SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = readWidgetData()
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
         completion(entry)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
-        let entry = readWidgetData()
-        let timeline = Timeline(entries: [entry], policy: .atEnd)
-        completion(timeline)
-    }
-    
-    private func readWidgetData() -> SimpleEntry {
-        var trainingsLast7Days = 0
-        var targetTrainingsPerWeek = 0
-        var currentWeight = 0.0
-        var targetWeight = 0.0
-        
-        do {
-            guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
-                print("Widget: Failed to get container URL")
-                return SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
-            }
-            
-            print("Widget: Container URL: \(containerURL.path)")
-            
-            let fileURL = containerURL.appendingPathComponent("widgetData.json")
-            print("Widget: Looking for data file at: \(fileURL.path)")
-            
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                print("Widget: Data file exists")
-                let data = try Data(contentsOf: fileURL)
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    trainingsLast7Days = json["trainingsLast7Days"] as? Int ?? 0
-                    targetTrainingsPerWeek = json["targetTrainingsPerWeek"] as? Int ?? 0
-                    currentWeight = json["currentWeight"] as? Double ?? 0
-                    targetWeight = json["targetWeight"] as? Double ?? 0
-                    
-                    print("Widget: Successfully read data - Trainings: \(trainingsLast7Days)/\(targetTrainingsPerWeek), Weight: \(currentWeight)/\(targetWeight)")
-                } else {
-                    print("Widget: Failed to parse JSON data")
-                }
-            } else {
-                print("Widget: No data file found at \(fileURL.path)")
-                // List contents of container directory for debugging
-                if let contents = try? FileManager.default.contentsOfDirectory(atPath: containerURL.path) {
-                    print("Widget: Container directory contents: \(contents)")
-                }
-            }
-        } catch {
-            print("Widget: Error reading data: \(error.localizedDescription)")
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.APP_GROUP_IDENTIFIER) else {
+            let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
+            let timeline = Timeline(entries: [entry], policy: .atEnd)
+            completion(timeline)
+            return
         }
         
-        return SimpleEntry(
-            date: Date(),
-            trainingsLast7Days: trainingsLast7Days,
-            targetTrainingsPerWeek: targetTrainingsPerWeek,
-            currentWeight: currentWeight,
-            targetWeight: targetWeight
-        )
+        let fileURL = containerURL.appendingPathComponent("widgetData.json")
+        
+        do {
+            let data = try Data(contentsOf: fileURL)
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let trainingsLast7Days = json["trainingsLast7Days"] as? Int ?? 0
+                let targetTrainingsPerWeek = json["targetTrainingsPerWeek"] as? Int ?? 0
+                let currentWeight = json["currentWeight"] as? Double ?? 0
+                let targetWeight = json["targetWeight"] as? Double ?? 0
+                
+                let entry = SimpleEntry(
+                    date: Date(),
+                    trainingsLast7Days: trainingsLast7Days,
+                    targetTrainingsPerWeek: targetTrainingsPerWeek,
+                    currentWeight: currentWeight,
+                    targetWeight: targetWeight
+                )
+                let timeline = Timeline(entries: [entry], policy: .atEnd)
+                completion(timeline)
+                return
+            }
+        } catch {
+            print("Error reading widget data: \(error)")
+        }
+        
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
+        let timeline = Timeline(entries: [entry], policy: .atEnd)
+        completion(timeline)
     }
 }
 
@@ -102,66 +84,42 @@ struct ClimbingTrackerWidgetEntryView : View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Climbing Goals")
-                .font(.system(size: 14, weight: .bold))
-                .padding(.bottom, 2)
+            Text("Training Progress")
+                .font(.headline)
             
-            // Training Progress
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text("Train")
-                        .font(.system(size: 12, weight: .semibold))
-                    Spacer()
-                    Text("\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)")
-                        .font(.system(size: 12))
-                }
-                
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .frame(width: geometry.size.width, height: 4)
-                            .opacity(0.3)
-                            .foregroundColor(.gray)
-                        
-                        Rectangle()
-                            .frame(width: min(CGFloat(entry.trainingProgress) * geometry.size.width, geometry.size.width), height: 4)
-                            .foregroundColor(entry.trainingProgress >= 1.0 ? .blue : .green)
-                    }
-                    .cornerRadius(2)
-                }
-                .frame(height: 4)
+            HStack {
+                Text("This Week")
+                Spacer()
+                Text("\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)")
             }
+            .font(.subheadline)
             
-            // Weight Progress
-            if let weightProgress = entry.weightProgress {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Weight")
-                            .font(.system(size: 12, weight: .semibold))
-                        Spacer()
-                        Text("\(String(format: "%.1f", entry.currentWeight)) kg")
-                            .font(.system(size: 12))
-                    }
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .frame(width: geometry.size.width, height: 10)
+                        .opacity(0.3)
+                        .foregroundColor(.gray)
                     
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .frame(width: geometry.size.width, height: 4)
-                                .opacity(0.3)
-                                .foregroundColor(.gray)
-                            
-                            Rectangle()
-                                .frame(width: min(CGFloat(weightProgress) * geometry.size.width, geometry.size.width), height: 4)
-                                .foregroundColor(weightProgress >= 1.0 ? .blue : .green)
-                        }
-                        .cornerRadius(2)
-                    }
-                    .frame(height: 4)
+                    let progress = entry.targetTrainingsPerWeek > 0 ? Double(entry.trainingsLast7Days) / Double(entry.targetTrainingsPerWeek) : 0
+                    Rectangle()
+                        .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 10)
+                        .foregroundColor(progress >= 1.0 ? .blue : .green)
                 }
+                .cornerRadius(5)
+            }
+            .frame(height: 10)
+            
+            if entry.currentWeight > 0 {
+                HStack {
+                    Text("Weight")
+                    Spacer()
+                    Text("\(String(format: "%.1f", entry.currentWeight)) kg")
+                }
+                .font(.subheadline)
             }
         }
-        .padding(8)
-        .containerBackground(.fill.tertiary, for: .widget)
+        .padding()
     }
 }
 
@@ -173,7 +131,7 @@ struct ClimbingTrackerWidget: Widget {
             ClimbingTrackerWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Climbing Tracker")
-        .description("View your training and weight progress.")
+        .description("Track your training progress and weight.")
         .supportedFamilies([.systemSmall])
     }
 }
@@ -181,5 +139,5 @@ struct ClimbingTrackerWidget: Widget {
 #Preview(as: .systemSmall) {
     ClimbingTrackerWidget()
 } timeline: {
-    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 79.2, targetWeight: 78.5)
+    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 75.5, targetWeight: 72.0)
 }

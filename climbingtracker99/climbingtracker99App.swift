@@ -20,8 +20,6 @@ struct climbingtracker99App: App {
         }
     }
     
-    let APP_VERSION = "1.0.1"
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
