@@ -18,8 +18,8 @@ struct Provider: TimelineProvider {
         completion(entry)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.APP_GROUP_IDENTIFIER) else {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.APP_GROUP_IDENTIFIER) else {
             let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0)
             let timeline = Timeline(entries: [entry], policy: .atEnd)
             completion(timeline)
@@ -80,7 +80,7 @@ struct SimpleEntry: TimelineEntry {
 }
 
 struct ClimbingTrackerWidgetEntryView : View {
-    var entry: Provider.Entry
+    var entry: SimpleEntry
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

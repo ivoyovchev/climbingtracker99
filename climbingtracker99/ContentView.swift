@@ -101,7 +101,7 @@ struct HomeView: View {
     }
     
     private func updateWidgetData() {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.APP_GROUP_IDENTIFIER) else {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: SharedConstants.APP_GROUP_IDENTIFIER) else {
             print("Failed to get container URL")
             return
         }
@@ -476,7 +476,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text(Constants.APP_VERSION)
+                        Text(SharedConstants.APP_VERSION)
                             .foregroundColor(.gray)
                     }
                 }
