@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4ACADD712DB1AEDC0084939F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD702DB1AEDB0084939F /* WidgetKit.framework */; };
+		4ACADD732DB1AEDC0084939F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD722DB1AEDC0084939F /* SwiftUI.framework */; };
+		4ACADD842DB1AEDE0084939F /* ClimbingTrackerWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4ACADD212DB17C500084939F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +27,48 @@
 			remoteGlobalIDString = 4ACADD0D2DB17C4E0084939F;
 			remoteInfo = climbingtracker99;
 		};
+		4ACADD822DB1AEDE0084939F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4ACADD062DB17C4E0084939F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4ACADD6D2DB1AEDB0084939F;
+			remoteInfo = ClimbingTrackerWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4ACADD892DB1AEDE0084939F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4ACADD842DB1AEDE0084939F /* ClimbingTrackerWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4ACADD0E2DB17C4E0084939F /* climbingtracker99.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = climbingtracker99.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4ACADD202DB17C500084939F /* climbingtracker99Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = climbingtracker99Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4ACADD2A2DB17C510084939F /* climbingtracker99UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = climbingtracker99UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ClimbingTrackerWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4ACADD702DB1AEDB0084939F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		4ACADD722DB1AEDC0084939F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		4ACADD8B2DB1AFA50084939F /* ClimbingTrackerWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClimbingTrackerWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4ACADD852DB1AEDE0084939F /* Exceptions for "ClimbingTrackerWidget" folder in "ClimbingTrackerWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4ACADD6D2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4ACADD102DB17C4E0084939F /* climbingtracker99 */ = {
@@ -43,6 +84,14 @@
 		4ACADD2D2DB17C510084939F /* climbingtracker99UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = climbingtracker99UITests;
+			sourceTree = "<group>";
+		};
+		4ACADD742DB1AEDC0084939F /* ClimbingTrackerWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4ACADD852DB1AEDE0084939F /* Exceptions for "ClimbingTrackerWidget" folder in "ClimbingTrackerWidgetExtension" target */,
+			);
+			path = ClimbingTrackerWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,15 +118,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4ACADD6B2DB1AEDB0084939F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4ACADD732DB1AEDC0084939F /* SwiftUI.framework in Frameworks */,
+				4ACADD712DB1AEDC0084939F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		4ACADD052DB17C4E0084939F = {
 			isa = PBXGroup;
 			children = (
+				4ACADD8B2DB1AFA50084939F /* ClimbingTrackerWidgetExtension.entitlements */,
 				4ACADD102DB17C4E0084939F /* climbingtracker99 */,
 				4ACADD232DB17C500084939F /* climbingtracker99Tests */,
 				4ACADD2D2DB17C510084939F /* climbingtracker99UITests */,
+				4ACADD742DB1AEDC0084939F /* ClimbingTrackerWidget */,
+				4ACADD6F2DB1AEDB0084939F /* Frameworks */,
 				4ACADD0F2DB17C4E0084939F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +149,18 @@
 				4ACADD0E2DB17C4E0084939F /* climbingtracker99.app */,
 				4ACADD202DB17C500084939F /* climbingtracker99Tests.xctest */,
 				4ACADD2A2DB17C510084939F /* climbingtracker99UITests.xctest */,
+				4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4ACADD6F2DB1AEDB0084939F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4ACADD702DB1AEDB0084939F /* WidgetKit.framework */,
+				4ACADD722DB1AEDC0084939F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +173,12 @@
 				4ACADD0A2DB17C4E0084939F /* Sources */,
 				4ACADD0B2DB17C4E0084939F /* Frameworks */,
 				4ACADD0C2DB17C4E0084939F /* Resources */,
+				4ACADD892DB1AEDE0084939F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4ACADD832DB1AEDE0084939F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4ACADD102DB17C4E0084939F /* climbingtracker99 */,
@@ -163,6 +236,28 @@
 			productReference = 4ACADD2A2DB17C510084939F /* climbingtracker99UITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		4ACADD6D2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4ACADD862DB1AEDE0084939F /* Build configuration list for PBXNativeTarget "ClimbingTrackerWidgetExtension" */;
+			buildPhases = (
+				4ACADD6A2DB1AEDB0084939F /* Sources */,
+				4ACADD6B2DB1AEDB0084939F /* Frameworks */,
+				4ACADD6C2DB1AEDB0084939F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4ACADD742DB1AEDC0084939F /* ClimbingTrackerWidget */,
+			);
+			name = ClimbingTrackerWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = ClimbingTrackerWidgetExtension;
+			productReference = 4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +279,9 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = 4ACADD0D2DB17C4E0084939F;
 					};
+					4ACADD6D2DB1AEDB0084939F = {
+						CreatedOnToolsVersion = 16.2;
+					};
 				};
 			};
 			buildConfigurationList = 4ACADD092DB17C4E0084939F /* Build configuration list for PBXProject "climbingtracker99" */;
@@ -203,6 +301,7 @@
 				4ACADD0D2DB17C4E0084939F /* climbingtracker99 */,
 				4ACADD1F2DB17C500084939F /* climbingtracker99Tests */,
 				4ACADD292DB17C510084939F /* climbingtracker99UITests */,
+				4ACADD6D2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +322,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4ACADD282DB17C510084939F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4ACADD6C2DB1AEDB0084939F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +359,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4ACADD6A2DB1AEDB0084939F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +378,11 @@
 			isa = PBXTargetDependency;
 			target = 4ACADD0D2DB17C4E0084939F /* climbingtracker99 */;
 			targetProxy = 4ACADD2B2DB17C510084939F /* PBXContainerItemProxy */;
+		};
+		4ACADD832DB1AEDE0084939F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4ACADD6D2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension */;
+			targetProxy = 4ACADD822DB1AEDE0084939F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -393,12 +511,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = climbingtracker99/climbingtracker99.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"climbingtracker99/Preview Content\"";
 				DEVELOPMENT_TEAM = UWUAQ5RCV7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Climbing Tracker";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -422,12 +543,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = climbingtracker99/climbingtracker99.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"climbingtracker99/Preview Content\"";
 				DEVELOPMENT_TEAM = UWUAQ5RCV7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Climbing Tracker";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -518,6 +642,62 @@
 			};
 			name = Release;
 		};
+		4ACADD872DB1AEDE0084939F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ClimbingTrackerWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UWUAQ5RCV7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ClimbingTrackerWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ClimbingTrackerWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tornado-studios.climbingtracker99.ClimbingTrackerWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4ACADD882DB1AEDE0084939F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ClimbingTrackerWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = UWUAQ5RCV7;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ClimbingTrackerWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ClimbingTrackerWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tornado-studios.climbingtracker99.ClimbingTrackerWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -553,6 +733,15 @@
 			buildConfigurations = (
 				4ACADD3B2DB17C510084939F /* Debug */,
 				4ACADD3C2DB17C510084939F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4ACADD862DB1AEDE0084939F /* Build configuration list for PBXNativeTarget "ClimbingTrackerWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4ACADD872DB1AEDE0084939F /* Debug */,
+				4ACADD882DB1AEDE0084939F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
