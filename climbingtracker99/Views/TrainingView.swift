@@ -1,6 +1,24 @@
 import SwiftUI
 import SwiftData
 
+// Add color extension for TrainingFocus
+extension TrainingFocus {
+    var color: Color {
+        switch self {
+        case .strength:
+            return .red
+        case .power:
+            return .orange
+        case .endurance:
+            return .green
+        case .technique:
+            return .blue
+        case .mobility:
+            return .purple
+        }
+    }
+}
+
 public struct TrainingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Training.date, order: .reverse) private var trainings: [Training]
@@ -12,13 +30,24 @@ public struct TrainingView: View {
     public var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                addTrainingButton
-                
                 ExerciseStatsView(trainings: trainings)
                 
                 trainingList
             }
-            .navigationTitle("Training")
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Text("Training")
+                            .font(.system(size: 24, weight: .bold))
+                        Spacer()
+                        Button(action: { showingAddTraining = true }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 24))
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddTraining) {
                 TrainingEditView()
             }
@@ -26,19 +55,6 @@ public struct TrainingView: View {
                 TrainingEditView(training: training)
             }
         }
-    }
-    
-    private var addTrainingButton: some View {
-        Button(action: { showingAddTraining = true }) {
-            Label("Add Training", systemImage: "plus.circle.fill")
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .cornerRadius(10)
-        }
-        .padding(.horizontal)
     }
     
     private var trainingList: some View {
@@ -66,43 +82,64 @@ struct TrainingRow: View {
     let onTap: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(training.date, style: .date)
-                    .font(.headline)
-                Spacer()
-                Text(training.date, style: .time)
+        HStack(spacing: 0) {
+            // Focus type colored stripe
+            Rectangle()
+                .fill(training.focus.color)
+                .frame(width: 8)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(training.date, style: .date)
+                        .font(.headline)
+                    Spacer()
+                    Text(training.date, style: .time)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                HStack {
+                    Text("\(training.duration) min")
+                        .font(.subheadline)
+                    Spacer()
+                    Text(training.location.rawValue)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                Text(training.focus.rawValue)
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(training.focus.color)
+                
+                // Exercise thumbnails
+                if !training.recordedExercises.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(training.recordedExercises) { recordedExercise in
+                                Image(recordedExercise.exercise.type.imageName)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 40, height: 30)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
+                if !training.notes.isEmpty {
+                    Text(training.notes)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
-            
-            HStack {
-                Text("\(training.duration) min")
-                    .font(.subheadline)
-                Spacer()
-                Text(training.location.rawValue)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
-            Text(training.focus.rawValue)
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            
-            if !training.recordedExercises.isEmpty {
-                Text("Exercises: \(training.recordedExercises.count)")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            
-            if !training.notes.isEmpty {
-                Text(training.notes)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
+            .padding(.leading, 12)
+            .padding(.trailing, 16)
+            .padding(.vertical, 12)
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+        .listRowInsets(EdgeInsets())
     }
 }
 
@@ -118,7 +155,23 @@ struct TrainingEditView: View {
     @State private var selectedExercises: [Exercise] = []
     @State private var recordedExercises: [RecordedExercise] = []
     @State private var notes: String = ""
-    @State private var showingExercisePicker = false
+    
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    // Computed property for available exercises
+    private var availableExercises: [Exercise] {
+        let selectedExerciseIds = recordedExercises.map { $0.exercise.id }
+        return exercises.filter { !selectedExerciseIds.contains($0.id) }
+    }
+    
+    private func addExercise(_ exercise: Exercise) {
+        // Create a new recorded exercise and add it
+        let recordedExercise = RecordedExercise(exercise: exercise)
+        recordedExercises.append(recordedExercise)
+    }
     
     var training: Training?
     var isEditing: Bool { training != nil }
@@ -126,66 +179,140 @@ struct TrainingEditView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Date & Time")) {
-                    DatePicker("Date", selection: $date, displayedComponents: [.date, .hourAndMinute])
-                }
-                
-                Section(header: Text("Details")) {
-                    Stepper("Duration: \(duration) min", value: $duration, in: 15...240, step: 15)
+                // Header section with three rows
+                Section {
+                    // Row 1: Date/Time
+                    DatePicker("Date & Time", selection: $date, displayedComponents: [.date, .hourAndMinute])
+                        .font(.subheadline)
                     
-                    Picker("Location", selection: $location) {
-                        ForEach(TrainingLocation.allCases, id: \.self) { location in
-                            Text(location.rawValue).tag(location)
-                        }
-                    }
-                    
-                    Picker("Focus", selection: $focus) {
-                        ForEach(TrainingFocus.allCases, id: \.self) { focus in
-                            Text(focus.rawValue).tag(focus)
-                        }
-                    }
-                }
-                
-                Section(header: Text("Exercises")) {
-                    ForEach(recordedExercises) { recordedExercise in
-                        NavigationLink(destination: ExerciseRecordView(recordedExercise: recordedExercise)) {
-                            VStack(alignment: .leading) {
-                                Text(recordedExercise.exercise.type.rawValue)
-                                    .font(.headline)
-                                
-                                switch recordedExercise.exercise.type {
-                                case .hangboarding:
-                                    if let grip = recordedExercise.gripType,
-                                       let duration = recordedExercise.duration,
-                                       let weight = recordedExercise.addedWeight {
-                                        Text("Grip: \(grip.rawValue), \(duration)s, +\(weight)kg")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                case .repeaters:
-                                    if let duration = recordedExercise.duration,
-                                       let reps = recordedExercise.repetitions,
-                                       let sets = recordedExercise.sets {
-                                        Text("\(duration)s × \(reps) reps × \(sets) sets")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                case .limitBouldering:
-                                    if let grade = recordedExercise.grade,
-                                       let routes = recordedExercise.routes {
-                                        Text("\(grade) × \(routes) routes")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+                    // Row 2: Location/Focus
+                    HStack(spacing: 20) {
+                        Picker("Location", selection: $location) {
+                            ForEach(TrainingLocation.allCases, id: \.self) { location in
+                                Text(location.rawValue).tag(location)
                             }
                         }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, -8)
+                        
+                        Picker("Focus", selection: $focus) {
+                            ForEach(TrainingFocus.allCases, id: \.self) { focus in
+                                Text(focus.rawValue).tag(focus)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, -8)
                     }
-                    .onDelete(perform: deleteExercises)
                     
-                    Button(action: { showingExercisePicker = true }) {
-                        Label("Add Exercise", systemImage: "plus")
+                    // Row 3: Duration
+                    HStack {
+                        Text("Duration")
+                            .font(.subheadline)
+                        Spacer()
+                        Text("\(duration) min")
+                            .font(.subheadline)
+                        Stepper("", value: $duration, in: 15...240, step: 15)
+                            .labelsHidden()
                     }
+                }
+                
+                // Completed Exercises section
+                if !recordedExercises.isEmpty {
+                    Section(header: Text("Completed Exercises")) {
+                        ForEach(recordedExercises) { recordedExercise in
+                            NavigationLink(destination: ExerciseRecordView(recordedExercise: recordedExercise)) {
+                                HStack(spacing: 12) {
+                                    Image(recordedExercise.exercise.type.imageName)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 60, height: 45)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(recordedExercise.exercise.type.rawValue)
+                                            .font(.system(size: 14, weight: .semibold))
+                                        
+                                        switch recordedExercise.exercise.type {
+                                        case .hangboarding:
+                                            if let grip = recordedExercise.gripType,
+                                               let duration = recordedExercise.duration,
+                                               let weight = recordedExercise.addedWeight {
+                                                Text("Grip: \(grip.rawValue), \(duration)s, +\(weight)kg")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        case .repeaters:
+                                            if let duration = recordedExercise.duration,
+                                               let reps = recordedExercise.repetitions,
+                                               let sets = recordedExercise.sets {
+                                                Text("\(duration)s × \(reps) reps × \(sets) sets")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        case .limitBouldering:
+                                            if let grade = recordedExercise.grade,
+                                               let routes = recordedExercise.routes {
+                                                Text("\(grade) × \(routes) routes")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        .onDelete(perform: deleteExercises)
+                    }
+                }
+                
+                // Available Exercises section
+                Section(header: Text("Available Exercises")) {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(availableExercises, id: \.id) { exercise in
+                            Button(action: {
+                                withAnimation {
+                                    addExercise(exercise)
+                                }
+                            }) {
+                                VStack(spacing: 8) {
+                                    Image(exercise.type.imageName)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(height: 80)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    
+                                    HStack {
+                                        Text(exercise.type.rawValue)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(.blue)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.bottom, 8)
+                                }
+                                .background(Color(.systemBackground))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(radius: 1)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
                 }
                 
                 Section(header: Text("Notes")) {
@@ -205,12 +332,6 @@ struct TrainingEditView: View {
                     Button(isEditing ? "Save" : "Add") {
                         saveTraining()
                     }
-                }
-            }
-            .sheet(isPresented: $showingExercisePicker) {
-                ExercisePickerView(selectedExercises: $selectedExercises) { exercise in
-                    let recordedExercise = RecordedExercise(exercise: exercise)
-                    recordedExercises.append(recordedExercise)
                 }
             }
             .onAppear {
@@ -250,75 +371,6 @@ struct TrainingEditView: View {
     
     private func deleteExercises(offsets: IndexSet) {
         recordedExercises.remove(atOffsets: offsets)
-    }
-}
-
-struct ExercisePickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Query private var exercises: [Exercise]
-    @Binding var selectedExercises: [Exercise]
-    var onSelect: (Exercise) -> Void
-    
-    var body: some View {
-        NavigationView {
-            List {
-                ForEach(exercises) { exercise in
-                    Button(action: {
-                        if !selectedExercises.contains(where: { $0.id == exercise.id }) {
-                            selectedExercises.append(exercise)
-                            onSelect(exercise)
-                        }
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(exercise.type.rawValue)
-                                    .font(.headline)
-                                
-                                switch exercise.type {
-                                case .hangboarding:
-                                    if let grip = exercise.gripType {
-                                        Text("Grip: \(grip.rawValue)")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                case .repeaters:
-                                    if let duration = exercise.duration,
-                                       let reps = exercise.repetitions,
-                                       let sets = exercise.sets {
-                                        Text("\(duration)s × \(reps) reps × \(sets) sets")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                case .limitBouldering:
-                                    if let grade = exercise.grade,
-                                       let routes = exercise.routes {
-                                        Text("\(grade) × \(routes) routes")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            if selectedExercises.contains(where: { $0.id == exercise.id }) {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Select Exercises")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
     }
 }
 

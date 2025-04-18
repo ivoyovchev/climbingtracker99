@@ -11,34 +11,44 @@ struct ExercisesView: View {
             List {
                 ForEach(exercises) { exercise in
                     NavigationLink(destination: ExerciseEditView(exercise: exercise)) {
-                        VStack(alignment: .leading) {
-                            Text(exercise.type.rawValue)
-                                .font(.headline)
+                        HStack(spacing: 16) {
+                            // Exercise Image
+                            Image(exercise.type.imageName)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 80, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             
-                            switch exercise.type {
-                            case .hangboarding:
-                                if let grip = exercise.gripType {
-                                    Text("Grip: \(grip.rawValue)")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            case .repeaters:
-                                if let duration = exercise.duration,
-                                   let reps = exercise.repetitions,
-                                   let sets = exercise.sets {
-                                    Text("\(duration)s × \(reps) reps × \(sets) sets")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            case .limitBouldering:
-                                if let grade = exercise.grade,
-                                   let routes = exercise.routes {
-                                    Text("\(grade) × \(routes) routes")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(exercise.type.rawValue)
+                                    .font(.headline)
+                                
+                                switch exercise.type {
+                                case .hangboarding:
+                                    if let grip = exercise.gripType {
+                                        Text("Grip: \(grip.rawValue)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                case .repeaters:
+                                    if let duration = exercise.duration,
+                                       let reps = exercise.repetitions,
+                                       let sets = exercise.sets {
+                                        Text("\(duration)s × \(reps) reps × \(sets) sets")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                case .limitBouldering:
+                                    if let grade = exercise.grade,
+                                       let routes = exercise.routes {
+                                        Text("\(grade) × \(routes) routes")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
                             }
                         }
+                        .padding(.vertical, 4)
                     }
                 }
                 .onDelete(perform: deleteExercises)
@@ -95,7 +105,15 @@ struct AddExerciseView: View {
                 Section(header: Text("Exercise Type")) {
                     Picker("Type", selection: $selectedType) {
                         ForEach(ExerciseType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                            HStack {
+                                Image(type.imageName)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 40, height: 30)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                                Text(type.rawValue)
+                            }
+                            .tag(type)
                         }
                     }
                 }

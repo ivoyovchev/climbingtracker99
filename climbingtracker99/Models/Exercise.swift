@@ -11,6 +11,17 @@ enum ExerciseType: String, CaseIterable, Codable {
     case hangboarding = "Hangboarding (Max Hang)"
     case repeaters = "Repeaters"
     case limitBouldering = "Limit Bouldering"
+    
+    var imageName: String {
+        switch self {
+        case .hangboarding:
+            return "hangboarding"
+        case .repeaters:
+            return "repeaters"
+        case .limitBouldering:
+            return "limit_bouldering"
+        }
+    }
 }
 
 @Model
