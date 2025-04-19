@@ -29,6 +29,16 @@ final class RecordedExercise: ObservableObject {
     var attempts: Int?
     var restBetweenRoutes: Int?
     var sessionDuration: Int?
+    var boardType: BoardType?
+    var gradeTried: String?
+    var moves: Int?
+    var weight: Int?
+    var edgeSize: Int?
+    // New flexibility parameters
+    var hamstrings: Bool = false
+    var hips: Bool = false
+    var forearms: Bool = false
+    var legs: Bool = false
     
     // ObservableObject conformance - marked as non-persisted
     @Transient
@@ -73,6 +83,10 @@ final class RecordedExercise: ObservableObject {
         update(\.grade, value: value)
     }
     
+    func updateGradeTried(_ value: String?) {
+        update(\.gradeTried, value: value)
+    }
+    
     func updateRoutes(_ value: Int?) {
         update(\.routes, value: value)
     }
@@ -87,6 +101,40 @@ final class RecordedExercise: ObservableObject {
     
     func updateSessionDuration(_ value: Int?) {
         update(\.sessionDuration, value: value)
+    }
+    
+    func updateMoves(_ value: Int?) {
+        update(\.moves, value: value)
+    }
+    
+    func updateWeight(_ value: Int?) {
+        update(\.weight, value: value)
+    }
+    
+    func updateEdgeSize(_ value: Int?) {
+        update(\.edgeSize, value: value)
+    }
+    
+    // New flexibility update methods
+    func updateHamstrings(_ value: Bool) {
+        update(\.hamstrings, value: value)
+    }
+    
+    func updateHips(_ value: Bool) {
+        update(\.hips, value: value)
+    }
+    
+    func updateForearms(_ value: Bool) {
+        update(\.forearms, value: value)
+    }
+    
+    func updateLegs(_ value: Bool) {
+        update(\.legs, value: value)
+    }
+    
+    // Add the missing updateBoardType method
+    func updateBoardType(_ value: BoardType?) {
+        update(\.boardType, value: value)
     }
 }
 

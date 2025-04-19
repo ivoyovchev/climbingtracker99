@@ -1,37 +1,36 @@
-# ClimbingTracker99
+# Climbing Tracker 99
 
-A comprehensive iOS/macOS app for tracking climbing training progress, health metrics, and nutrition.
+A comprehensive climbing training and progress tracking app for iOS.
 
-## Version 1.0.4
+## Version 1.0.5
 
 ### Features
-- Training tracking with customizable exercises
-- Weight and health metrics monitoring
-- Nutrition tracking
-- Photo gallery for training moments
-- Widget support for quick progress viewing
-- Data visualization with charts and progress bars
+- Track your climbing training sessions
+- Record and analyze different types of exercises
+- Monitor your weight and health metrics
+- Set and track training goals
+- Capture and organize climbing moments
+- View detailed statistics and progress
+- Widget support for quick access to key metrics
 
 ### Recent Updates
-- Improved exercise grid layout with better spacing and aspect ratio
-- Enhanced exercise tile design for better visibility
-- Consistent padding and spacing across the training interface
-- Improved exercise recording interface
-- Enhanced grade selection for Limit Bouldering
-- Consistent header layout across all tabs
-- Centered and larger titles
-- Improved spacing and visual hierarchy
-- Enhanced widget UI
+- Simplified exercise analysis view
+- Improved performance and stability
+- Enhanced user interface
+- Fixed various bugs and issues
 
 ### Requirements
-- iOS 17.0+ / macOS 14.0+
-- Xcode 15.0+
-- Swift 5.9+
+- iOS 17.0 or later
+- Xcode 15.0 or later
+- Swift 5.9 or later
 
 ### Installation
 1. Clone the repository
-2. Open `climbingtracker99.xcodeproj` in Xcode
-3. Build and run the project
+2. Open the project in Xcode
+3. Build and run on your device or simulator
+
+### Contributing
+Feel free to submit issues and enhancement requests.
 
 ### License
 This project is licensed under the MIT License - see the LICENSE file for details.

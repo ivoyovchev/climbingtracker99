@@ -10,6 +10,7 @@
 		4ACADD712DB1AEDC0084939F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD702DB1AEDB0084939F /* WidgetKit.framework */; };
 		4ACADD732DB1AEDC0084939F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD722DB1AEDC0084939F /* SwiftUI.framework */; };
 		4ACADD842DB1AEDE0084939F /* ClimbingTrackerWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4ACADDDD2DB28CD60084939F /* SharedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 4ACADDDC2DB28CD60084939F /* SharedPackage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -101,6 +102,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4ACADDDD2DB28CD60084939F /* SharedPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +187,7 @@
 			);
 			name = climbingtracker99;
 			packageProductDependencies = (
+				4ACADDDC2DB28CD60084939F /* SharedPackage */,
 			);
 			productName = climbingtracker99;
 			productReference = 4ACADD0E2DB17C4E0084939F /* climbingtracker99.app */;
@@ -293,6 +296,9 @@
 			);
 			mainGroup = 4ACADD052DB17C4E0084939F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4ACADDDB2DB28CD60084939F /* XCLocalSwiftPackageReference "SharedPackage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4ACADD0F2DB17C4E0084939F /* Products */;
 			projectDirPath = "";
@@ -747,6 +753,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4ACADDDB2DB28CD60084939F /* XCLocalSwiftPackageReference "SharedPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = SharedPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4ACADDDC2DB28CD60084939F /* SharedPackage */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SharedPackage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4ACADD062DB17C4E0084939F /* Project object */;
 }

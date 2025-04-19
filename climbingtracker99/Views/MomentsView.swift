@@ -1,171 +1,234 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import AVKit
+
+struct MediaFilter {
+    let allMedia: [Media]
+    let selectedTab: MediaType
+    let selectedFocus: TrainingFocus?
+    let selectedLocation: TrainingLocation?
+    let searchText: String
+    
+    func filtered() -> [Media] {
+        // Step 1: Filter by type
+        var result = allMedia.filter { $0.type == selectedTab }
+        
+        // Step 2: Filter by focus if selected
+        if let focus = selectedFocus {
+            result = result.filter { $0.training?.focus == focus }
+        }
+        
+        // Step 3: Filter by location if selected
+        if let location = selectedLocation {
+            result = result.filter { $0.training?.location == location }
+        }
+        
+        // Step 4: Filter by search text if not empty
+        if !searchText.isEmpty {
+            let searchLower = searchText.lowercased()
+            result = result.filter { media in
+                guard let training = media.training else { return false }
+                return training.notes.lowercased().contains(searchLower) ||
+                       training.focus.rawValue.lowercased().contains(searchLower) ||
+                       training.location.rawValue.lowercased().contains(searchLower)
+            }
+        }
+        
+        return result
+    }
+}
+
+@Observable
+class MomentsViewModel {
+    var selectedMedia: Media?
+    var showingMediaDetail = false
+    var searchText = ""
+    var selectedFocus: TrainingFocus?
+    var selectedLocation: TrainingLocation?
+    var selectedTab: MediaType = .image
+    
+    private let trainings: [Training]
+    
+    init(trainings: [Training]) {
+        self.trainings = trainings
+    }
+    
+    private var allMedia: [Media] {
+        var result: [Media] = []
+        for training in trainings {
+            result.append(contentsOf: training.media)
+        }
+        return result.sorted { $0.date > $1.date }
+    }
+    
+    var filteredMedia: [Media] {
+        let filter = MediaFilter(
+            allMedia: allMedia,
+            selectedTab: selectedTab,
+            selectedFocus: selectedFocus,
+            selectedLocation: selectedLocation,
+            searchText: searchText
+        )
+        return filter.filtered()
+    }
+}
+
+struct MediaGridItemView: View {
+    let media: Media
+    let size: CGFloat
+    
+    private var focusIndicator: some View {
+        Group {
+            if let training = media.training {
+                Circle()
+                    .fill(training.focus.color)
+                    .frame(width: 8, height: 8)
+                    .padding(4)
+                    .background(Color.black.opacity(0.5))
+                    .clipShape(Circle())
+            }
+        }
+    }
+    
+    private var overlayContent: some View {
+        VStack {
+            HStack {
+                focusIndicator
+                Spacer()
+            }
+            Spacer()
+        }
+        .padding(4)
+    }
+    
+    var body: some View {
+        if let image = media.thumbnail {
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: size, height: size)
+                .clipped()
+                .overlay(overlayContent)
+        }
+    }
+}
 
 struct MomentsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var trainings: [Training]
-    
-    @State private var selectedMedia: Media?
-    @State private var showingMediaDetail = false
+    @Query(sort: \Training.date, order: .reverse) private var trainings: [Training]
+    @State private var viewModel: MomentsViewModel
     @State private var gridLayout: [GridItem] = Array(repeating: .init(.flexible()), count: 3)
-    @State private var searchText = ""
-    @State private var selectedFocus: TrainingFocus?
-    @State private var selectedLocation: TrainingLocation?
     
-    private var allMedia: [Media] {
-        trainings.flatMap { $0.media }
-            .sorted { $0.date > $1.date }
+    init() {
+        _viewModel = State(initialValue: MomentsViewModel(trainings: []))
     }
     
-    private var filteredMedia: [Media] {
-        var filtered = allMedia
-        
-        // Apply focus filter
-        if let focus = selectedFocus {
-            filtered = filtered.filter { media in
-                media.training?.focus == focus
+    private func mediaTypeButton(_ type: MediaType) -> some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                viewModel.selectedTab = type
+            }
+        }) {
+            Text(type.rawValue)
+                .font(.caption)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(viewModel.selectedTab == type ? Color.blue : Color.gray.opacity(0.2))
+                .foregroundColor(viewModel.selectedTab == type ? .white : .primary)
+                .cornerRadius(15)
+        }
+    }
+    
+    private var mediaTypeTabs: some View {
+        HStack(spacing: 8) {
+            ForEach(MediaType.allCases, id: \.self) { type in
+                mediaTypeButton(type)
             }
         }
-        
-        // Apply location filter
-        if let location = selectedLocation {
-            filtered = filtered.filter { media in
-                media.training?.location == location
-            }
-        }
-        
-        // Apply search text filter
-        if !searchText.isEmpty {
-            filtered = filtered.filter { media in
-                if let training = media.training {
-                    return training.notes.localizedCaseInsensitiveContains(searchText) ||
-                           training.focus.rawValue.localizedCaseInsensitiveContains(searchText) ||
-                           training.location.rawValue.localizedCaseInsensitiveContains(searchText)
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
+    }
+    
+    private var filterButtons: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Focus Filters
+                ForEach(TrainingFocus.allCases, id: \.self) { focus in
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.selectedFocus = viewModel.selectedFocus == focus ? nil : focus
+                        }
+                    }) {
+                        Text(focus.rawValue)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(viewModel.selectedFocus == focus ? focus.color : Color.gray.opacity(0.2))
+                            .foregroundColor(viewModel.selectedFocus == focus ? .white : .primary)
+                            .cornerRadius(15)
+                    }
                 }
-                return false
+                
+                // Location Filters
+                ForEach(TrainingLocation.allCases, id: \.self) { location in
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.selectedLocation = viewModel.selectedLocation == location ? nil : location
+                        }
+                    }) {
+                        Text(location.rawValue)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(viewModel.selectedLocation == location ? Color.blue : Color.gray.opacity(0.2))
+                            .foregroundColor(viewModel.selectedLocation == location ? .white : .primary)
+                            .cornerRadius(15)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .background(Color(.systemBackground))
+    }
+    
+    private var mediaGrid: some View {
+        ScrollView {
+            LazyVGrid(columns: gridLayout, spacing: 2) {
+                ForEach(viewModel.filteredMedia, id: \.id) { media in
+                    GeometryReader { geometry in
+                        MediaGridItemView(media: media, size: geometry.size.width)
+                            .onTapGesture {
+                                viewModel.selectedMedia = media
+                                viewModel.showingMediaDetail = true
+                            }
+                    }
+                    .aspectRatio(1, contentMode: .fit)
+                }
             }
         }
-        
-        return filtered
     }
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                TabHeaderView(title: "Moments") {
-                    Menu {
-                        Button(action: { gridLayout = Array(repeating: .init(.flexible()), count: 2) }) {
-                            Label("2 Columns", systemImage: "rectangle.grid.2x2")
-                        }
-                        Button(action: { gridLayout = Array(repeating: .init(.flexible()), count: 3) }) {
-                            Label("3 Columns", systemImage: "rectangle.grid.3x2")
-                        }
-                        Button(action: { gridLayout = Array(repeating: .init(.flexible()), count: 4) }) {
-                            Label("4 Columns", systemImage: "rectangle.grid.4x3")
-                        }
-                    } label: {
-                        Image(systemName: "square.grid.2x2")
-                            .font(.system(size: 24))
-                    }
-                }
-                
-                // Filter Buttons
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        // Focus Filters
-                        ForEach(TrainingFocus.allCases, id: \.self) { focus in
-                            Button(action: {
-                                selectedFocus = selectedFocus == focus ? nil : focus
-                            }) {
-                                Text(focus.rawValue)
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(selectedFocus == focus ? focus.color : Color.gray.opacity(0.2))
-                                    .foregroundColor(selectedFocus == focus ? .white : .primary)
-                                    .cornerRadius(15)
-                            }
-                        }
-                        
-                        // Location Filters
-                        ForEach(TrainingLocation.allCases, id: \.self) { location in
-                            Button(action: {
-                                selectedLocation = selectedLocation == location ? nil : location
-                            }) {
-                                Text(location.rawValue)
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(selectedLocation == location ? Color.blue : Color.gray.opacity(0.2))
-                                    .foregroundColor(selectedLocation == location ? .white : .primary)
-                                    .cornerRadius(15)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    mediaTypeTabs
                 }
-                .background(Color(.systemBackground))
-                
-                // Grid View
-                ScrollView {
-                    LazyVGrid(columns: gridLayout, spacing: 2) {
-                        ForEach(filteredMedia) { media in
-                            if let image = media.thumbnail {
-                                GeometryReader { geometry in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: geometry.size.width, height: geometry.size.width)
-                                        .clipped()
-                                        .overlay(
-                                            VStack {
-                                                HStack {
-                                                    if let training = media.training {
-                                                        Circle()
-                                                            .fill(training.focus.color)
-                                                            .frame(width: 8, height: 8)
-                                                            .padding(4)
-                                                            .background(Color.black.opacity(0.5))
-                                                            .cornerRadius(8)
-                                                    }
-                                                    Spacer()
-                                                }
-                                                .padding(.top, 4)
-                                                .padding(.leading, 4)
-                                                
-                                                Spacer()
-                                                
-                                                HStack {
-                                                    if let training = media.training {
-                                                        Text(training.date, style: .date)
-                                                            .font(.caption2)
-                                                            .foregroundColor(.white)
-                                                            .padding(4)
-                                                            .background(Color.black.opacity(0.5))
-                                                            .cornerRadius(4)
-                                                    }
-                                                    Spacer()
-                                                }
-                                                .padding(4)
-                                            }
-                                        )
-                                        .onTapGesture {
-                                            selectedMedia = media
-                                            showingMediaDetail = true
-                                        }
-                                }
-                                .aspectRatio(1, contentMode: .fit)
-                            }
-                        }
-                    }
+                filterButtons
+                mediaGrid
+            }
+            .navigationTitle("Moments")
+            .searchable(text: $viewModel.searchText, prompt: "Search moments")
+            .sheet(isPresented: $viewModel.showingMediaDetail) {
+                if let media = viewModel.selectedMedia {
+                    MediaDetailView(media: media)
                 }
             }
-            .navigationBarHidden(true)
-            .searchable(text: $searchText, prompt: "Search by date, focus, or location")
-            .sheet(item: $selectedMedia) { media in
-                MediaDetailView(media: media)
+            .onAppear {
+                viewModel = MomentsViewModel(trainings: trainings)
             }
         }
     }
@@ -176,12 +239,15 @@ struct MediaDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
-    @State private var offset: CGFloat = 0
-    @State private var currentIndex: Int = 0
+    @State private var currentIndex: Int
+    @State private var player: AVPlayer?
     
-    private var allMedia: [Media] {
-        media.training?.media.sorted { $0.date > $1.date } ?? []
+    private let allMedia: [Media]
+    
+    init(media: Media) {
+        self.media = media
+        self.allMedia = media.training?.media.sorted { $0.date > $1.date } ?? []
+        _currentIndex = State(initialValue: self.allMedia.firstIndex(where: { $0.id == media.id }) ?? 0)
     }
     
     private var currentMedia: Media {
@@ -193,6 +259,8 @@ struct MediaDetailView: View {
             if currentIndex < allMedia.count - 1 {
                 currentIndex += 1
                 scale = 1.0
+                player?.pause()
+                player = nil
             }
         }
     }
@@ -202,6 +270,91 @@ struct MediaDetailView: View {
             if currentIndex > 0 {
                 currentIndex -= 1
                 scale = 1.0
+                player?.pause()
+                player = nil
+            }
+        }
+    }
+    
+    private func handleSwipe(_ value: DragGesture.Value) {
+        if value.translation.width > 0 {
+            previousImage()
+        } else {
+            nextImage()
+        }
+    }
+    
+    private var mediaContent: some View {
+        Group {
+            if currentMedia.type == .image {
+                if let image = currentMedia.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(scale)
+                        .onTapGesture(count: 2) {
+                            withAnimation {
+                                scale = scale == 1.0 ? 2.0 : 1.0
+                            }
+                        }
+                }
+            } else if let videoURL = currentMedia.videoURL {
+                VideoPlayer(player: player)
+                    .onAppear {
+                        player = AVPlayer(url: videoURL)
+                        player?.play()
+                    }
+                    .onDisappear {
+                        player?.pause()
+                        player = nil
+                    }
+            }
+        }
+    }
+    
+    private var detailsContent: some View {
+        Group {
+            if let training = currentMedia.training {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Training Details")
+                        .font(.headline)
+                        .padding(.top)
+                    
+                    HStack {
+                        Text(training.date, style: .date)
+                        Spacer()
+                        Text(training.focus.rawValue)
+                            .foregroundColor(training.focus.color)
+                    }
+                    
+                    HStack {
+                        Text("\(training.duration) min")
+                        Spacer()
+                        Text(training.location.rawValue)
+                    }
+                    
+                    if !training.notes.isEmpty {
+                        Text("Notes:")
+                            .font(.headline)
+                        Text(training.notes)
+                    }
+                }
+                .padding()
+            }
+        }
+    }
+    
+    private var indicatorContent: some View {
+        Group {
+            if allMedia.count > 1 {
+                HStack(spacing: 8) {
+                    ForEach(0..<allMedia.count, id: \.self) { index in
+                        Circle()
+                            .fill(index == currentIndex ? Color.primary : Color.gray.opacity(0.3))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+                .padding(.bottom)
             }
         }
     }
@@ -209,110 +362,22 @@ struct MediaDetailView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if let image = currentMedia.image {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .scaleEffect(scale)
-                        .offset(x: offset)
-                        .gesture(
-                            SimultaneousGesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        let delta = value / lastScale
-                                        lastScale = value
-                                        scale = min(max(scale * delta, 1), 4)
-                                    }
-                                    .onEnded { _ in
-                                        lastScale = 1.0
-                                    },
-                                DragGesture()
-                                    .onChanged { value in
-                                        offset = value.translation.width
-                                    }
-                                    .onEnded { value in
-                                        let threshold: CGFloat = 50
-                                        if value.translation.width > threshold {
-                                            previousImage()
-                                        } else if value.translation.width < -threshold {
-                                            nextImage()
-                                        }
-                                        offset = 0
-                                    }
-                            )
-                        )
-                }
-                
-                if let training = currentMedia.training {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Training Details")
-                            .font(.headline)
-                            .padding(.top)
-                        
-                        HStack {
-                            Text("Date:")
-                            Spacer()
-                            Text(training.date, style: .date)
-                        }
-                        
-                        HStack {
-                            Text("Location:")
-                            Spacer()
-                            Text(training.location.rawValue)
-                        }
-                        
-                        HStack {
-                            Text("Focus:")
-                            Spacer()
-                            Text(training.focus.rawValue)
-                                .foregroundColor(training.focus.color)
-                        }
-                        
-                        if !training.notes.isEmpty {
-                            Text("Notes:")
-                                .font(.headline)
-                                .padding(.top)
-                            Text(training.notes)
-                        }
-                    }
-                    .padding()
-                }
-                
-                // Page indicator
-                if allMedia.count > 1 {
-                    HStack(spacing: 8) {
-                        ForEach(0..<allMedia.count, id: \.self) { index in
-                            Circle()
-                                .fill(index == currentIndex ? Color.primary : Color.gray.opacity(0.3))
-                                .frame(width: 8, height: 8)
-                        }
-                    }
-                    .padding(.bottom)
-                }
+                mediaContent
+                detailsContent
+                indicatorContent
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: previousImage) {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                    }
-                    .disabled(currentIndex == 0)
-                }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: nextImage) {
-                        Image(systemName: "chevron.right")
-                            .font(.title2)
+                    Button("Done") {
+                        dismiss()
                     }
-                    .disabled(currentIndex == allMedia.count - 1)
-                }
-                
-                ToolbarItem(placement: .principal) {
-                    Text("\(currentIndex + 1) of \(allMedia.count)")
-                        .font(.subheadline)
                 }
             }
+            .gesture(
+                DragGesture(minimumDistance: 50)
+                    .onEnded(handleSwipe)
+            )
         }
     }
 } 
