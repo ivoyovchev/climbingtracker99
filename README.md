@@ -2,7 +2,7 @@
 
 A comprehensive climbing training and progress tracking app for iOS.
 
-## Version 1.0.6
+## Version 1.0.7
 
 ### Features
 - Track your climbing training sessions
@@ -14,6 +14,7 @@ A comprehensive climbing training and progress tracking app for iOS.
 - Widget support for quick access to key metrics
 
 ### Recent Updates
+- Updated widget UI for a cleaner, flatter design with improved spacing and alignment
 - Improved widget design with climbing-specific icons
 - Enhanced dashboard view with consistent title styling
 - Optimized widget layout for better readability

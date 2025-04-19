@@ -111,29 +111,25 @@ struct ClimbingTrackerWidgetEntryView : View {
     var entry: SimpleEntry
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Header with climbing icon
-            HStack(alignment: .center, spacing: 2) {
-                Image(systemName: "figure.climbing")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.orange)
-                    .frame(height: 28)
-                
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Climbing")
-                        .font(.system(size: 12, weight: .bold))
-                        .lineLimit(1)
-                    Text("Tracker")
-                        .font(.system(size: 12, weight: .bold))
-                        .lineLimit(1)
-                }
-                
+        VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack(alignment: .center, spacing: 4) {
+                Image("climbing.icon")
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundColor(.black)
+                    .frame(height: 20)
+                Text("Climbing Tracker")
+                    .font(.system(size: 16, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer()
             }
-            .padding(.bottom, 1)
+            .padding(.bottom, 6)
             
             // Training Progress Section
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 2) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 11))
@@ -168,7 +164,7 @@ struct ClimbingTrackerWidgetEntryView : View {
             
             // Weight Progress Section
             if entry.currentWeight > 0 {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 2) {
                         Image(systemName: "scalemass")
                             .font(.system(size: 11))
@@ -211,11 +207,13 @@ struct ClimbingTrackerWidgetEntryView : View {
                 }
             }
         }
-        .padding(6)
+        .padding(.horizontal, 10)
+        .padding(.top, 16)
+        .padding(.bottom, 10)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
         )
         .containerBackground(for: .widget) {
             Color(.systemBackground)
@@ -233,6 +231,7 @@ struct ClimbingTrackerWidget: Widget {
         .configurationDisplayName("Climbing Tracker")
         .description("Track your training progress and weight.")
         .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
 
