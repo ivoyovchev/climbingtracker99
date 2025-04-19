@@ -111,70 +111,112 @@ struct ClimbingTrackerWidgetEntryView : View {
     var entry: SimpleEntry
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Training Progress")
-                .font(.system(size: 12, weight: .semibold))
-            
-            HStack {
-                Text("This Week")
-                    .font(.system(size: 10))
-                Spacer()
-                Text("\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)")
-                    .font(.system(size: 10))
-            }
-            
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: geometry.size.width, height: 6)
-                        .opacity(0.3)
-                        .foregroundColor(.gray)
-                    
-                    let progress = entry.targetTrainingsPerWeek > 0 ? Double(entry.trainingsLast7Days) / Double(entry.targetTrainingsPerWeek) : 0
-                    Rectangle()
-                        .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 6)
-                        .foregroundColor(progress >= 1.0 ? .blue : .green)
-                }
-                .cornerRadius(3)
-            }
-            .frame(height: 6)
-            
-            if entry.currentWeight > 0 {
-                HStack {
-                    Text("Weight")
-                        .font(.system(size: 10))
-                    Spacer()
-                    Text("\(String(format: "%.1f", entry.currentWeight)) kg")
-                        .font(.system(size: 10))
+        VStack(alignment: .leading, spacing: 4) {
+            // Header with climbing icon
+            HStack(alignment: .center, spacing: 2) {
+                Image(systemName: "figure.climbing")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.orange)
+                    .frame(height: 28)
+                
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Climbing")
+                        .font(.system(size: 12, weight: .bold))
+                        .lineLimit(1)
+                    Text("Tracker")
+                        .font(.system(size: 12, weight: .bold))
+                        .lineLimit(1)
                 }
                 
-                if let weightProgress = entry.weightProgress {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .frame(width: geometry.size.width, height: 6)
-                                .opacity(0.3)
-                                .foregroundColor(.gray)
-                            
-                            if weightProgress.isOverStarting {
-                                // Show red bar for the overage
-                                Rectangle()
+                Spacer()
+            }
+            .padding(.bottom, 1)
+            
+            // Training Progress Section
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 2) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 11))
+                        .foregroundColor(.blue)
+                    Text("Training")
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.blue)
+                        .lineLimit(1)
+                }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Background track
+                        RoundedRectangle(cornerRadius: 2)
+                            .frame(width: geometry.size.width, height: 6)
+                            .foregroundColor(Color(.systemGray5))
+                        
+                        // Progress bar
+                        let progress = entry.targetTrainingsPerWeek > 0 ? Double(entry.trainingsLast7Days) / Double(entry.targetTrainingsPerWeek) : 0
+                        RoundedRectangle(cornerRadius: 2)
+                            .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 6)
+                            .foregroundColor(progress >= 1.0 ? .green : .blue)
+                            .shadow(color: .blue.opacity(0.3), radius: 1, x: 0, y: 1)
+                    }
+                }
+                .frame(height: 6)
+            }
+            
+            // Weight Progress Section
+            if entry.currentWeight > 0 {
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "scalemass")
+                            .font(.system(size: 11))
+                            .foregroundColor(.orange)
+                        Text("Weight")
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(String(format: "%.1f", entry.currentWeight)) kg")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.orange)
+                            .lineLimit(1)
+                    }
+                    
+                    if let weightProgress = entry.weightProgress {
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                // Background track
+                                RoundedRectangle(cornerRadius: 2)
                                     .frame(width: geometry.size.width, height: 6)
-                                    .foregroundColor(.red)
-                            } else {
-                                // Show progress bar
-                                Rectangle()
-                                    .frame(width: min(CGFloat(weightProgress.progress) * geometry.size.width, geometry.size.width), height: 6)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(Color(.systemGray5))
+                                
+                                if weightProgress.isOverStarting {
+                                    // Show red bar for the overage
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .frame(width: geometry.size.width, height: 6)
+                                        .foregroundColor(.red)
+                                        .shadow(color: .red.opacity(0.3), radius: 1, x: 0, y: 1)
+                                } else {
+                                    // Show progress bar
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .frame(width: min(CGFloat(weightProgress.progress) * geometry.size.width, geometry.size.width), height: 6)
+                                        .foregroundColor(.orange)
+                                        .shadow(color: .orange.opacity(0.3), radius: 1, x: 0, y: 1)
+                                }
                             }
                         }
-                        .cornerRadius(3)
+                        .frame(height: 6)
                     }
-                    .frame(height: 6)
                 }
             }
         }
-        .padding(8)
+        .padding(6)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        )
         .containerBackground(for: .widget) {
             Color(.systemBackground)
         }

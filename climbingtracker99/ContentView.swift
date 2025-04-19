@@ -9,6 +9,28 @@ import SwiftUI
 import SwiftData
 import WidgetKit
 
+struct TabNavigationTitle: ViewModifier {
+    let title: String
+    
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(.headline)
+                }
+            }
+    }
+}
+
+extension View {
+    func tabNavigationTitle(_ title: String) -> some View {
+        modifier(TabNavigationTitle(title: title))
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     
@@ -16,7 +38,7 @@ struct ContentView: View {
         TabView {
             HomeView()
                 .tabItem {
-                    Label("Home", systemImage: "house")
+                    Label("Dashboard", systemImage: "chart.bar")
                 }
             
             TrainingView()
@@ -220,6 +242,13 @@ struct HomeView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    TabHeaderView(title: "Dashboard") {
+                        Button(action: { showingGoalsSheet = true }) {
+                            Image(systemName: "target")
+                                .font(.system(size: 24))
+                        }
+                    }
+                    
                     // Goals Section
                     Section(header: Text("Goals")) {
                         VStack(spacing: 15) {
@@ -318,15 +347,7 @@ struct HomeView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingGoalsSheet = true }) {
-                        Image(systemName: "target")
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingGoalsSheet) {
                 GoalsEditView(goals: userGoals)
             }
@@ -494,6 +515,7 @@ struct HealthView: View {
                     .onDelete(perform: deleteEntries)
                 }
             }
+            .tabNavigationTitle("Health")
             .navigationBarHidden(true)
             .sheet(isPresented: $showingAddWeight) {
                 WeightEntryView()
@@ -551,7 +573,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("1.0.5")
+                        Text("1.0.6")
                             .foregroundColor(.gray)
                     }
                 }
@@ -567,7 +589,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Settings")
+            .tabNavigationTitle("Settings")
             .alert("Reset All Data", isPresented: $showingResetAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Reset", role: .destructive) {
