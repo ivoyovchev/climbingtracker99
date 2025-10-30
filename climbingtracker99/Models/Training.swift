@@ -39,6 +39,10 @@ final class RecordedExercise: ObservableObject {
     var hips: Bool = false
     var forearms: Bool = false
     var legs: Bool = false
+    // Running specific properties
+    var hours: Int?
+    var minutes: Int?
+    var distance: Double?
     
     // ObservableObject conformance - marked as non-persisted
     @Transient
@@ -136,6 +140,18 @@ final class RecordedExercise: ObservableObject {
     func updateBoardType(_ value: BoardType?) {
         update(\.boardType, value: value)
     }
+    
+    func updateHours(_ value: Int?) {
+        update(\.hours, value: value)
+    }
+    
+    func updateMinutes(_ value: Int?) {
+        update(\.minutes, value: value)
+    }
+    
+    func updateDistance(_ value: Double?) {
+        update(\.distance, value: value)
+    }
 }
 
 @Model
@@ -158,5 +174,24 @@ final class Training {
         self.recordedExercises = recordedExercises
         self.notes = notes
         self.media = media
+    }
+    
+    static func fetchTrainings(from startDate: Date, to endDate: Date) -> [Training] {
+        let descriptor = FetchDescriptor<Training>(
+            predicate: #Predicate<Training> { training in
+                training.date >= startDate && training.date <= endDate
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        
+        do {
+            // Get the shared model container from the app
+            let container = try ModelContainer(for: Training.self, configurations: ModelConfiguration(isStoredInMemoryOnly: false))
+            let context = ModelContext(container)
+            return try context.fetch(descriptor)
+        } catch {
+            print("Error fetching trainings: \(error)")
+            return []
+        }
     }
 } 

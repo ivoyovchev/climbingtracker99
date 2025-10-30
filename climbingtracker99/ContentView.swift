@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import Charts
 
 struct TabNavigationTitle: ViewModifier {
     let title: String
@@ -69,468 +70,292 @@ struct ContentView: View {
     }
 }
 
-struct HomeView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Training.date, order: .reverse) private var trainings: [Training]
-    @Query(sort: \WeightEntry.date, order: .reverse) private var weightEntries: [WeightEntry]
-    @Query private var goals: [Goals]
-    
-    @State private var showingGoalsSheet = false
-    @State private var animateStats = false
-    
-    private var currentWeight: Double? {
-        weightEntries.first?.weight
-    }
-    
-    private var trainingsLast7Days: Int {
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        return trainings.filter { $0.date >= sevenDaysAgo }.count
-    }
-    
-    private var trainingsLast30Days: Int {
-        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
-        return trainings.filter { $0.date >= thirtyDaysAgo }.count
-    }
-    
-    private var trainingsLast6Months: Int {
-        let sixMonthsAgo = Calendar.current.date(byAdding: .month, value: -6, to: Date())!
-        return trainings.filter { $0.date >= sixMonthsAgo }.count
-    }
-    
-    private var totalTrainingTime: Int {
-        trainings.reduce(0) { $0 + $1.duration }
-    }
-    
-    private var averageTrainingTime: Double {
-        guard !trainings.isEmpty else { return 0 }
-        return Double(totalTrainingTime) / Double(trainings.count)
-    }
-    
-    private var exerciseFocusDistribution: [(focus: TrainingFocus, count: Int)] {
-        let allExercises = trainings.flatMap { $0.recordedExercises }
-        let counts = Dictionary(grouping: allExercises) { exercise in
-            exercise.exercise.focus ?? .strength
-        }
-        .mapValues { $0.count }
-        return TrainingFocus.allCases.map { focus in
-            (focus: focus, count: counts[focus] ?? 0)
-        }
-    }
-    
-    private var exerciseTypeDistribution: [(type: ExerciseType, count: Int)] {
-        let allExercises = trainings.flatMap { $0.recordedExercises }
-        let counts = Dictionary(grouping: allExercises) { exercise in
-            exercise.exercise.type
-        }
-        .mapValues { $0.count }
-        .filter { $0.value > 0 }
-        .sorted { $0.value > $1.value }
-        
-        return counts.map { (type: $0.key, count: $0.value) }
-    }
-    
-    private var trainingLocationDistribution: [(location: TrainingLocation, count: Int)] {
-        let counts = Dictionary(grouping: trainings, by: \.location)
-            .mapValues { $0.count }
-        return TrainingLocation.allCases.map { location in
-            (location: location, count: counts[location] ?? 0)
-        }
-    }
-    
-    private var userGoals: Goals {
-        if let existingGoals = goals.first {
-            return existingGoals
-        }
-        let newGoals = Goals()
-        modelContext.insert(newGoals)
-        return newGoals
-    }
-    
-    private var trainingProgress: Double {
-        guard userGoals.targetTrainingsPerWeek > 0 else { return 0 }
-        return Double(trainingsLast7Days) / Double(userGoals.targetTrainingsPerWeek)
-    }
-    
-    private var weightProgress: Double? {
-        guard let current = currentWeight, 
-              let starting = userGoals.startingWeight,
-              userGoals.targetWeight > 0 else { return nil }
-        
-        if current > userGoals.targetWeight {
-            return 1.0 - ((current - userGoals.targetWeight) / (starting - userGoals.targetWeight))
-        } else {
-            return (current - starting) / (userGoals.targetWeight - starting)
-        }
-    }
-    
-    private var recentTrainings: [Training] {
-        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date())!
-        return trainings.filter { $0.date >= thirtyDaysAgo }
-    }
-    
-    private var exercisesByFocus: [(focus: TrainingFocus, exercises: [(type: ExerciseType, count: Int)])] {
-        TrainingFocus.allCases.map { focus in
-            let exercises = exerciseTypeDistribution
-                .filter { $0.count > 0 }
-                .filter { exercise in
-                    let exerciseFocus = trainings
-                        .flatMap { $0.recordedExercises }
-                        .first { $0.exercise.type == exercise.type }?
-                        .exercise.focus ?? .strength
-                    return exerciseFocus == focus
-                }
-            return (focus: focus, exercises: exercises)
-        }
-    }
-    
-    private func updateWidgetData() {
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
-            print("Failed to get container URL")
-            return
-        }
-        
-        // Ensure the container directory exists
-        do {
-            try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
-            print("Container directory exists at: \(containerURL.path)")
-        } catch {
-            print("Failed to create container directory: \(error.localizedDescription)")
-            return
-        }
-        
-        let fileURL = containerURL.appendingPathComponent("widgetData.json")
-        print("Writing widget data to: \(fileURL.path)")
-        
-        // Calculate trainings in last 7 days
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        let recentTrainings = trainings.filter { $0.date >= sevenDaysAgo }.count
-        
-        // Calculate weight progress for widget
-        var weightProgress: Double = 0
-        if let current = currentWeight,
-           let starting = userGoals.startingWeight,
-           userGoals.targetWeight > 0 {
-            if current > userGoals.targetWeight {
-                weightProgress = 1.0 - ((current - userGoals.targetWeight) / (starting - userGoals.targetWeight))
-            } else {
-                weightProgress = (current - starting) / (userGoals.targetWeight - starting)
-            }
-        }
-        
-        let data = [
-            "trainingsLast7Days": recentTrainings,
-            "targetTrainingsPerWeek": userGoals.targetTrainingsPerWeek,
-            "currentWeight": currentWeight ?? 0.0,
-            "targetWeight": userGoals.targetWeight,
-            "startingWeight": userGoals.startingWeight ?? 0.0,
-            "weightProgress": weightProgress
-        ] as [String : Any]
-        
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: data)
-            try jsonData.write(to: fileURL, options: .atomic)
-            print("Successfully wrote widget data: \(data)")
-            
-            // Force a widget update
-            WidgetCenter.shared.reloadAllTimelines()
-        } catch {
-            print("Failed to write widget data: \(error.localizedDescription)")
-        }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    TabHeaderView(title: "Dashboard") {
-                        Button(action: { showingGoalsSheet = true }) {
-                            Image(systemName: "target")
-                                .font(.system(size: 24))
-                        }
-                    }
-                    
-                    // Goals Section
-                    Section(header: Text("Goals")) {
-                        VStack(spacing: 15) {
-                            if let userGoals = goals.first {
-                                // Training Progress
-                                ProgressView(value: trainingProgress) {
-                                    HStack {
-                                        Text("Training")
-                                            .font(.subheadline)
-                                        Spacer()
-                                        Text("\(trainingsLast7Days)/\(userGoals.targetTrainingsPerWeek)")
-                                            .font(.subheadline)
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                                
-                                // Weight Progress
-                                if let progress = weightProgress {
-                                    ProgressView(value: progress) {
-                                        HStack {
-                                            Text("Weight")
-                                                .font(.subheadline)
-                                            Spacer()
-                                            if let current = currentWeight {
-                                                Text(String(format: "%.1f/%.1f kg", current, userGoals.targetWeight))
-                                                    .font(.subheadline)
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(15)
-                        .shadow(radius: 5)
-                    }
-                    
-                    // Stats Section
-                    Section(header: Text("Stats")) {
-                        VStack(spacing: 15) {
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
-                                StatCard(
-                                    title: "Total Time",
-                                    value: "\(totalTrainingTime) min",
-                                    icon: "clock.fill",
-                                    color: .orange
-                                )
-                                
-                                StatCard(
-                                    title: "Avg. Duration",
-                                    value: String(format: "%.0f min", averageTrainingTime),
-                                    icon: "timer",
-                                    color: .purple
-                                )
-                                
-                                StatCard(
-                                    title: "Last 30 Days",
-                                    value: "\(trainingsLast30Days)",
-                                    icon: "calendar",
-                                    color: .blue
-                                )
-                                
-                                StatCard(
-                                    title: "Last 6 Months",
-                                    value: "\(trainingsLast6Months)",
-                                    icon: "chart.bar.fill",
-                                    color: .green
-                                )
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(15)
-                        .shadow(radius: 5)
-                    }
-                    
-                    // Exercise Stats Section
-                    Section(header: Text("Exercise Analysis")) {
-                        VStack(spacing: 15) {
-                            ForEach(exercisesByFocus, id: \.focus) { section in
-                                if !section.exercises.isEmpty {
-                                    FocusExerciseSection(
-                                        focus: section.focus,
-                                        exercises: section.exercises
-                                    )
-                                }
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(15)
-                        .shadow(radius: 5)
-                    }
-                }
-                .padding()
-            }
-            .navigationBarHidden(true)
-            .sheet(isPresented: $showingGoalsSheet) {
-                GoalsEditView(goals: userGoals)
-            }
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    animateStats = true
-                }
-            }
-            .onChange(of: trainings) { oldValue, newValue in
-                print("Trainings changed - Count: \(newValue.count)")
-                updateWidgetData()
-            }
-            .onChange(of: weightEntries) { oldValue, newValue in
-                print("Weight entries changed - Count: \(newValue.count)")
-                updateWidgetData()
-            }
-            .onChange(of: goals) { oldValue, newValue in
-                print("Goals changed")
-                updateWidgetData()
-            }
-        }
-    }
-}
-
-struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
-            Text(value)
-                .font(.title2)
-                .bold()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .shadow(radius: 2)
-    }
-}
-
-struct GoalsEditView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var targetTrainings: Int
-    @State private var targetWeight: Double
-    @State private var startingWeight: Double?
-    
-    let goals: Goals
-    
-    init(goals: Goals) {
-        self.goals = goals
-        _targetTrainings = State(initialValue: goals.targetTrainingsPerWeek)
-        _targetWeight = State(initialValue: goals.targetWeight)
-        _startingWeight = State(initialValue: goals.startingWeight)
-    }
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Training Goals")) {
-                    Stepper("Target trainings per week: \(targetTrainings)", value: $targetTrainings, in: 1...7)
-                }
-                
-                Section(header: Text("Weight Goals")) {
-                    HStack {
-                        Text("Starting Weight")
-                        Spacer()
-                        TextField("Weight", value: $startingWeight, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                        Text("kg")
-                    }
-                    
-                    HStack {
-                        Text("Target Weight")
-                        Spacer()
-                        TextField("Weight", value: $targetWeight, format: .number)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                        Text("kg")
-                    }
-                }
-            }
-            .navigationTitle("Edit Goals")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        goals.targetTrainingsPerWeek = targetTrainings
-                        goals.targetWeight = targetWeight
-                        goals.startingWeight = startingWeight
-                        goals.lastUpdated = Date()
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
 struct HealthView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WeightEntry.date, order: .reverse) private var weightEntries: [WeightEntry]
     @State private var showingAddWeight = false
     @State private var entryToEdit: WeightEntry?
+    @State private var isSyncingHealth = false
+    @State private var showingCustomize = false
     
-    private var sortedEntries: [WeightEntry] {
-        weightEntries
+    // Range selection
+    enum MetricRange: String, CaseIterable, Identifiable { case week = "Week", month = "Month", year = "Year"; var id: String { rawValue } }
+    @State private var selectedRange: MetricRange = .week
+    
+    // HealthKit-backed state
+    @State private var hkWeight: [(date: Date, kg: Double)] = []
+    @State private var hkSleep: [(start: Date, end: Date, value: Int)] = []
+    @State private var hkHRSamples: [(date: Date, bpm: Double)] = []
+    @State private var hkEnergyDaily: [(date: Date, kcal: Double)] = []
+    
+    init() {}
+    
+    // Metric configuration
+    enum HealthMetricType: String, CaseIterable, Identifiable { case weight = "Weight", sleep = "Sleep", heartRate = "Heart Rate", energy = "Active Energy"; var id: String { rawValue } }
+    struct MetricConfig: Identifiable { let id = UUID(); var type: HealthMetricType; var enabled: Bool }
+    @State private var metricConfigs: [MetricConfig] = [
+        .init(type: .weight, enabled: true),
+        .init(type: .sleep, enabled: true),
+        .init(type: .heartRate, enabled: true),
+        .init(type: .energy, enabled: true)
+    ]
+    
+    private func rangeStartDate() -> Date {
+        let now = Date()
+        switch selectedRange {
+        case .week: return Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
+        case .month: return Calendar.current.date(byAdding: .month, value: -1, to: now) ?? now
+        case .year: return Calendar.current.date(byAdding: .year, value: -1, to: now) ?? now
+        }
     }
+    
+    private func filterSeries(_ series: [(Date, Double)]) -> [(Date, Double)] {
+        let start = rangeStartDate()
+        let filtered = series.filter { $0.0 >= start }
+        if !filtered.isEmpty { return filtered }
+        // Fallback: show recent points if range has no data
+        let counts: [MetricRange: Int] = [.week: 14, .month: 60, .year: 365]
+        let n = counts[selectedRange] ?? 30
+        return Array(series.suffix(n))
+    }
+    
+    // Aggregations
+    private var weightSeries: [(Date, Double)] {
+        let samples = hkWeight.isEmpty ? weightEntries.map { ($0.date, $0.weight) } : hkWeight
+        // Aggregate to daily (latest of the day)
+        var byDay: [Date: (Date, Double)] = [:]
+        for (date, value) in samples {
+            let day = Calendar.current.startOfDay(for: date)
+            if let existing = byDay[day] {
+                if date > existing.0 { byDay[day] = (date, value) }
+            } else {
+                byDay[day] = (date, value)
+            }
+        }
+        return byDay.map { ($0.key, $0.value.1) }.sorted { $0.0 < $1.0 }
+    }
+    private var sleepDailyHours: [(Date, Double)] {
+        var map: [Date: Double] = [:]
+        let cal = Calendar.current
+        for seg in hkSleep where [1,3,4,5].contains(seg.value) {
+            var cursorStart = seg.start
+            let end = seg.end
+            while cursorStart < end {
+                let dayStart = cal.startOfDay(for: cursorStart)
+                let nextDay = cal.date(byAdding: .day, value: 1, to: dayStart)!
+                let chunkEnd = min(end, nextDay)
+                let hours = chunkEnd.timeIntervalSince(cursorStart) / 3600.0
+                map[dayStart, default: 0] += max(0, hours)
+                cursorStart = chunkEnd
+            }
+        }
+        return map.map { ($0.key, $0.value) }.sorted { $0.0 < $1.0 }
+    }
+    private var hrSeries: [(Date, Double)] { hkHRSamples.sorted { $0.0 < $1.0 } }
+    private var energySeries: [(Date, Double)] { hkEnergyDaily.sorted { $0.0 < $1.0 } }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                TabHeaderView(title: "Health") {
-                    Button(action: { showingAddWeight = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 24))
-                    }
-                }
-                
-                WeightGraphView(entries: sortedEntries)
-                    .frame(height: 200)
-                    .padding()
-                
-                List {
-                    ForEach(sortedEntries) { entry in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text("\(String(format: "%.1f", entry.weight)) kg")
-                                    .font(.headline)
-                                Text(entry.date, style: .date)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                if !entry.note.isEmpty {
-                                    Text(entry.note)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
+            ScrollView {
+                VStack(spacing: 12) {
+                    TabHeaderView(title: "Health") {
+                        HStack(spacing: 16) {
+                            Picker("", selection: $selectedRange) {
+                                ForEach(MetricRange.allCases) { r in Text(r.rawValue).tag(r) }
                             }
-                            Spacer()
-                            Button(action: { entryToEdit = entry }) {
-                                Image(systemName: "pencil")
-                                    .foregroundColor(.blue)
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 240)
+                            Button(action: { showingCustomize = true }) { Image(systemName: "slider.horizontal.3").font(.system(size: 22)) }
+                            Button(action: { syncWithAppleHealth() }) {
+                                if isSyncingHealth { ProgressView().progressViewStyle(CircularProgressViewStyle()) }
+                                else { Image(systemName: "arrow.down.circle.fill").font(.system(size: 24)) }
+                            }
+                            Button(action: { showingAddWeight = true }) { Image(systemName: "plus.circle.fill").font(.system(size: 24)) }
+                        }
+                    }
+                    
+                    VStack(spacing: 16) {
+                        ForEach(metricConfigs.indices, id: \.self) { idx in
+                            if metricConfigs[idx].enabled {
+                                switch metricConfigs[idx].type {
+                                case .weight:
+                                    MetricChart(title: "Weight", unit: "kg", color: .blue, series: filterSeries(weightSeries))
+                                case .sleep:
+                                    MetricChart(title: "Sleep", unit: "h", color: .purple, series: filterSeries(sleepDailyHours))
+                                case .heartRate:
+                                    MetricChart(title: "Heart Rate", unit: "bpm", color: .red, series: filterSeries(hrSeries))
+                                case .energy:
+                                    MetricChart(title: "Active Energy", unit: "kcal", color: .orange, series: filterSeries(energySeries))
+                                }
                             }
                         }
                     }
-                    .onDelete(perform: deleteEntries)
+                    .padding(.horizontal)
                 }
+                .padding(.vertical)
             }
             .tabNavigationTitle("Health")
             .navigationBarHidden(true)
-            .sheet(isPresented: $showingAddWeight) {
-                WeightEntryView()
+            .sheet(isPresented: $showingAddWeight) { WeightEntryView() }
+            .sheet(isPresented: $showingCustomize) { customizeSheet }
+            .task { await refreshHealthDataOnAppear() }
+        }
+    }
+    
+    private var customizeSheet: some View {
+        NavigationView {
+            List {
+                ForEach($metricConfigs) { $config in
+                    HStack {
+                        Image(systemName: config.enabled ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(config.enabled ? .blue : .secondary)
+                        Text(config.type.rawValue)
+                        Spacer()
+                        Toggle("", isOn: $config.enabled).labelsHidden()
+                    }
+                }
+                .onMove { indices, newOffset in
+                    metricConfigs.move(fromOffsets: indices, toOffset: newOffset)
+                }
             }
-            .sheet(item: $entryToEdit) { entry in
-                WeightEntryView(entry: entry)
+            .navigationTitle("Customize")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) { EditButton() }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { showingCustomize = false } }
             }
         }
     }
     
-    private func deleteEntries(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(sortedEntries[index])
+    private func syncWithAppleHealth() {
+        guard HealthKitManager.shared.isHealthDataAvailable else { return }
+        isSyncingHealth = true
+        Task {
+            do {
+                try await HealthKitManager.shared.requestAuthorization()
+                let now = Date()
+                let start6m = Calendar.current.date(byAdding: .month, value: -12, to: now) ?? Date.distantPast
+                // Weight
+                hkWeight = try await HealthKitManager.shared.fetchBodyMassSamples(from: start6m, to: now)
+                // Sleep last 30d (fallback to 12m if empty)
+                let primarySleepStart = Calendar.current.date(byAdding: .day, value: -30, to: now)!
+                hkSleep = try await HealthKitManager.shared.fetchSleepFallbackIfEmpty(primaryStart: primarySleepStart, end: now)
+                // Heart Rate last 14d
+                hkHRSamples = try await HealthKitManager.shared.fetchHeartRateSamples(from: Calendar.current.date(byAdding: .day, value: -14, to: now)!, to: now)
+                // Energy daily last 14d (sum per day)
+                var daily: [(Date, Double)] = []
+                for d in 0..<14 {
+                    let day = Calendar.current.date(byAdding: .day, value: -d, to: now)!
+                    let start = Calendar.current.startOfDay(for: day)
+                    let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+                    let kcal = try await HealthKitManager.shared.fetchActiveEnergySum(from: start, to: end)
+                    daily.append((start, kcal))
+                }
+                hkEnergyDaily = daily.sorted { $0.0 < $1.0 }
+                // Import new weights
+                let existing = Set(weightEntries.map { $0.date.timeIntervalSince1970 })
+                for (date, kg) in hkWeight where !existing.contains(date.timeIntervalSince1970) {
+                    modelContext.insert(WeightEntry(weight: kg, date: date))
+                }
+            } catch { print("Health sync error: \(error)") }
+            isSyncingHealth = false
+        }
+    }
+    
+    private func refreshHealthDataOnAppear() async {
+        guard HealthKitManager.shared.isHealthDataAvailable else { return }
+        do {
+            try await HealthKitManager.shared.requestAuthorization()
+            let now = Date()
+            let start6m = Calendar.current.date(byAdding: .month, value: -12, to: now) ?? Date.distantPast
+            hkWeight = try await HealthKitManager.shared.fetchBodyMassSamples(from: start6m, to: now)
+            let primarySleepStart = Calendar.current.date(byAdding: .day, value: -30, to: now)!
+            hkSleep = try await HealthKitManager.shared.fetchSleepFallbackIfEmpty(primaryStart: primarySleepStart, end: now)
+            hkHRSamples = try await HealthKitManager.shared.fetchHeartRateSamples(from: Calendar.current.date(byAdding: .day, value: -14, to: now)!, to: now)
+            var daily: [(Date, Double)] = []
+            for d in 0..<14 {
+                let day = Calendar.current.date(byAdding: .day, value: -d, to: now)!
+                let start = Calendar.current.startOfDay(for: day)
+                let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+                let kcal = try await HealthKitManager.shared.fetchActiveEnergySum(from: start, to: end)
+                daily.append((start, kcal))
             }
+            hkEnergyDaily = daily.sorted { $0.0 < $1.0 }
+        } catch {
+            print("Health refresh error: \(error)")
+        }
+    }
+}
+
+private struct MetricChart: View {
+    let title: String
+    let unit: String
+    let color: Color
+    let series: [(Date, Double)]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.headline)
+            if series.isEmpty {
+                Text("No data").foregroundColor(.secondary).font(.footnote)
+            } else {
+                Chart {
+                    ForEach(Array(series.enumerated()), id: \.offset) { _, p in
+                        LineMark(x: .value("Date", p.0), y: .value(unit, p.1))
+                            .foregroundStyle(color)
+                        PointMark(x: .value("Date", p.0), y: .value(unit, p.1))
+                            .foregroundStyle(color.opacity(0.8))
+                    }
+                }
+                .frame(height: 220)
+            }
+        }
+        .padding(12)
+        .background(Color(.systemBackground))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+        .cornerRadius(12)
+    }
+}
+
+// Health metric card component
+private struct HealthMetricCard<Content: View>: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let tint: Color
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title).font(.subheadline).foregroundColor(.secondary)
+                Spacer()
+            }
+            Text(value).font(.title2).bold().foregroundColor(.primary)
+            if !subtitle.isEmpty { Text(subtitle).font(.caption).foregroundColor(.secondary) }
+            content
+        }
+        .padding(12)
+        .background(Color(.systemBackground))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+        .cornerRadius(12)
+    }
+}
+
+// Simple sparkline for weight
+private struct Sparkline: View {
+    let points: [(Date, Double)]
+    var body: some View {
+        if points.isEmpty {
+            Rectangle().fill(Color.clear)
+        } else {
+            Chart {
+                ForEach(Array(points.enumerated()), id: \.offset) { _, p in
+                    LineMark(x: .value("Date", p.0), y: .value("Value", p.1))
+                        .foregroundStyle(Color.blue)
+                }
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
         }
     }
 }
@@ -539,8 +364,13 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var userSettings: [UserSettings]
     @Query private var weightEntries: [WeightEntry]
+    @Query private var moonLogs: [MoonLogEntry]
     @State private var showingResetAlert = false
     @State private var showingWelcome = false
+    @State private var moonUsername: String = Keychain.get("mb_username") ?? ""
+    @State private var moonPassword: String = ""
+    @State private var syncingMoon = false
+    @State private var moonSyncMessage: String = ""
     
     private var settings: UserSettings? {
         userSettings.first
@@ -549,6 +379,30 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("MoonBoard")) {
+                    HStack {
+                        Text("Username")
+                        Spacer()
+                        TextField("username", text: $moonUsername)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                    }
+                    HStack {
+                        Text("Password")
+                        Spacer()
+                        SecureField("password", text: $moonPassword)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        if syncingMoon { ProgressView() }
+                        Button("Sync from MoonBoard") { Task { await syncMoonBoard() } }
+                            .disabled(moonUsername.isEmpty || moonPassword.isEmpty)
+                        Spacer()
+                        if !moonSyncMessage.isEmpty {
+                            Text(moonSyncMessage).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                }
                 if let userName = settings?.userName {
                     Section(header: Text("User Info")) {
                         HStack {
@@ -604,6 +458,43 @@ struct SettingsView: View {
         }
     }
     
+    private func syncMoonBoard() async {
+        syncingMoon = true
+        moonSyncMessage = ""
+        do {
+            Keychain.set(moonUsername, for: "mb_username")
+            let token = try await MoonBoardClient.shared.login(username: moonUsername, password: moonPassword)
+            let since = Calendar.current.date(byAdding: .year, value: -1, to: Date())
+            let entries = try await MoonBoardClient.shared.fetchLogbook(accessToken: token, since: since)
+            var imported = 0
+            for dto in entries {
+                // Parse date (accept ISO8601 or yyyy-MM-dd)
+                let date: Date
+                if let d = ISO8601DateFormatter().date(from: dto.date) {
+                    date = d
+                } else {
+                    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; date = f.date(from: dto.date) ?? Date()
+                }
+                // Deduplicate by (date + problemId)
+                if !moonLogs.contains(where: { $0.problemId == dto.problem.id && Calendar.current.isDate($0.date, inSameDayAs: date) }) {
+                    let entry = MoonLogEntry(date: date,
+                                             problemId: dto.problem.id,
+                                             problemName: dto.problem.name,
+                                             grade: dto.problem.grade,
+                                             board: dto.problem.board ?? "",
+                                             attempts: dto.attempts,
+                                             sent: dto.sent)
+                    modelContext.insert(entry)
+                    imported += 1
+                }
+            }
+            moonSyncMessage = "Imported \(imported) entries"
+        } catch {
+            moonSyncMessage = "Sync failed"
+        }
+        syncingMoon = false
+    }
+    
     private func resetAllData() {
         // Delete all data
         func deleteAll<T>(_ type: T.Type) where T: PersistentModel {
@@ -622,6 +513,7 @@ struct SettingsView: View {
         deleteAll(Goals.self)
         deleteAll(Media.self)
         deleteAll(Meal.self)
+        deleteAll(MoonLogEntry.self)
         
         // Reset user settings
         if let settings = settings {
@@ -673,6 +565,92 @@ struct FocusExerciseSection: View {
             }
         }
         .padding(.horizontal)
+    }
+}
+
+struct ExerciseGoalProgressView: View {
+    let goal: ExerciseGoal
+    let progress: Double
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(goal.exerciseType.rawValue)
+                    .font(.headline)
+                Spacer()
+                Text(String(format: "%.0f%%", progress * 100))
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            ProgressView(value: progress)
+                .tint(progressColor)
+            
+            HStack {
+                if goal.exerciseType == .hangboarding {
+                    let currentDuration = Int(goal.getCurrentValue("duration") ?? 0)
+                    let targetDuration = Int(goal.getTargetValue("duration") ?? 0)
+                    Text("\(currentDuration)s / \(targetDuration)s")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else if goal.exerciseType == .repeaters {
+                    let currentReps = Int(goal.getCurrentValue("repetitions") ?? 0)
+                    let targetReps = Int(goal.getTargetValue("repetitions") ?? 0)
+                    Text("\(currentReps) / \(targetReps) reps")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if let deadline = goal.deadline {
+                    Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+    
+    private var progressColor: Color {
+        switch progress {
+        case 0..<0.5: return .red
+        case 0.5..<0.8: return .orange
+        case 0.8..<1.0: return .yellow
+        default: return .green
+        }
+    }
+}
+
+struct CircularProgressView: View {
+    let progress: Double
+    let title: String
+    let subtitle: String
+    let color: Color
+    
+    var body: some View {
+        VStack {
+            ZStack {
+                Circle()
+                    .stroke(color.opacity(0.2), lineWidth: 8)
+                    .frame(width: 80, height: 80)
+                
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .frame(width: 80, height: 80)
+                    .rotationEffect(.degrees(-90))
+                
+                VStack {
+                    Text(String(format: "%.0f%%", progress * 100))
+                        .font(.headline)
+                    Text(title)
+                        .font(.caption)
+                }
+            }
+            
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
     }
 }
 

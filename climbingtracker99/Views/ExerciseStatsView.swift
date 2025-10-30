@@ -88,6 +88,8 @@ struct ExerciseStatsCard: View {
                 MaxHangsStats(trainings: trainings, focus: focus)
             case .flexibility:
                 FlexibilityStats(trainings: trainings, focus: focus)
+            case .running:
+                RunningStats(trainings: trainings, focus: focus)
             }
         }
         .padding()
@@ -432,6 +434,56 @@ struct FlexibilityStats: View {
                     .font(.subheadline)
                 ForEach(flexibilityAreas.sorted(), id: \.self) { area in
                     Text(area)
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+struct RunningStats: View {
+    let trainings: [Training]
+    let focus: TrainingFocus
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            let maxDistance = trainings.flatMap { $0.recordedExercises }
+                .filter { 
+                    $0.exercise.type == .running && 
+                    $0.exercise.focus == focus 
+                }
+                .compactMap { $0.distance }
+                .max()
+            
+            let totalDuration = trainings.flatMap { $0.recordedExercises }
+                .filter { 
+                    $0.exercise.type == .running && 
+                    $0.exercise.focus == focus 
+                }
+                .reduce(0) { total, exercise in
+                    let hours = exercise.hours ?? 0
+                    let minutes = exercise.minutes ?? 0
+                    return total + (hours * 60 + minutes)
+                }
+            
+            if let maxDistance = maxDistance {
+                HStack {
+                    Text("Max Distance")
+                        .font(.subheadline)
+                    Spacer()
+                    Text(String(format: "%.2f km", maxDistance))
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            if totalDuration > 0 {
+                HStack {
+                    Text("Total Duration")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(totalDuration / 60)h \(totalDuration % 60)m")
                         .font(.subheadline)
                         .foregroundColor(.blue)
                 }

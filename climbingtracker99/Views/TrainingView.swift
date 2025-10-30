@@ -713,6 +713,8 @@ struct ExerciseDetails: View {
                 MaxHangsDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .flexibility:
                 FlexibilityDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .running:
+                RunningDetails(exercise: exercise, recordedExercise: recordedExercise)
             }
         }
     }
@@ -923,6 +925,22 @@ struct FlexibilityDetails: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
         }
+    }
+}
+
+struct RunningDetails: View {
+    let exercise: Exercise
+    let recordedExercise: RecordedExercise?
+    
+    var body: some View {
+        let hours = recordedExercise?.hours ?? exercise.hours ?? 0
+        let minutes = recordedExercise?.minutes ?? exercise.minutes ?? 30
+        let distance = recordedExercise?.distance ?? exercise.distance ?? 5.0
+        
+        Text("\(hours)h \(minutes)m × \(String(format: "%.2f", distance))km")
+            .font(.system(size: 11))
+            .foregroundColor(.secondary)
+            .lineLimit(1)
     }
 }
 

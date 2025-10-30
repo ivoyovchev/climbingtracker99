@@ -26,6 +26,7 @@ enum ExerciseType: String, CaseIterable, Codable {
     case edgePickups = "Edge Pickups"
     case maxHangs = "Max Hangs"
     case flexibility = "Flexibility"
+    case running = "Running"
     
     var imageName: String {
         switch self {
@@ -53,6 +54,8 @@ enum ExerciseType: String, CaseIterable, Codable {
             return "max_hangs"
         case .flexibility:
             return "flexibility"
+        case .running:
+            return "running"
         }
     }
 }
@@ -81,6 +84,10 @@ final class Exercise {
     var hips: Bool = false
     var forearms: Bool = false
     var legs: Bool = false
+    // Running specific properties
+    var hours: Int?
+    var minutes: Int?
+    var distance: Double?
     
     init(type: ExerciseType, focus: TrainingFocus? = .strength) {
         self.type = type
@@ -153,6 +160,11 @@ final class Exercise {
             self.hips = false
             self.forearms = false
             self.legs = false
+        case .running:
+            self.hours = 0
+            self.minutes = 30
+            self.distance = 5.0
+            self.focus = .endurance
         }
     }
 } 

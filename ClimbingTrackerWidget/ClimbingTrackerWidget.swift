@@ -10,18 +10,18 @@ import SwiftUI
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
+        SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
-            let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
-            let timeline = Timeline(entries: [entry], policy: .atEnd)
+            let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+            let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(300))) // Update every 5 minutes
             completion(timeline)
             return
         }
@@ -37,15 +37,31 @@ struct Provider: TimelineProvider {
                 let targetWeight = json["targetWeight"] as? Double ?? 0
                 let startingWeight = json["startingWeight"] as? Double ?? 0
                 
+                // Parse exercise goals
+                var exerciseGoals: [ExerciseGoalData] = []
+                if let goalsData = json["exerciseGoals"] as? [[String: Any]] {
+                    for goalData in goalsData {
+                        if let type = goalData["type"] as? String,
+                           let progress = goalData["progress"] as? Double,
+                           let details = goalData["details"] as? String {
+                            exerciseGoals.append(ExerciseGoalData(type: type, progress: progress, details: details))
+                        }
+                    }
+                }
+                
                 let entry = SimpleEntry(
                     date: Date(),
                     trainingsLast7Days: trainingsLast7Days,
                     targetTrainingsPerWeek: targetTrainingsPerWeek,
                     currentWeight: currentWeight,
                     targetWeight: targetWeight,
-                    startingWeight: startingWeight
+                    startingWeight: startingWeight,
+                    exerciseGoals: exerciseGoals
                 )
-                let timeline = Timeline(entries: [entry], policy: .atEnd)
+                
+                // Update every 5 minutes
+                let nextUpdate = Date().addingTimeInterval(300)
+                let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
                 completion(timeline)
                 return
             }
@@ -53,8 +69,8 @@ struct Provider: TimelineProvider {
             print("Error reading widget data: \(error)")
         }
         
-        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
-        let timeline = Timeline(entries: [entry], policy: .atEnd)
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+        let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(300))) // Update every 5 minutes
         completion(timeline)
     }
 }
@@ -66,6 +82,7 @@ struct SimpleEntry: TimelineEntry {
     let currentWeight: Double
     let targetWeight: Double
     let startingWeight: Double
+    let exerciseGoals: [ExerciseGoalData]
     
     var trainingProgress: Double {
         guard targetTrainingsPerWeek > 0 else { return 0 }
@@ -79,24 +96,24 @@ struct SimpleEntry: TimelineEntry {
             // Losing weight
             if currentWeight > startingWeight {
                 // Over starting weight
-                return (1.0, true)
+                return (0.0, true)
             } else if currentWeight < targetWeight {
                 // Below target weight
-                return (0.0, false)
+                return (1.0, false)
             } else {
                 // Between starting and target
                 let totalRange = startingWeight - targetWeight
-                let currentRange = currentWeight - targetWeight
+                let currentRange = startingWeight - currentWeight
                 return (currentRange / totalRange, false)
             }
         } else {
             // Gaining weight
             if currentWeight < startingWeight {
                 // Below starting weight
-                return (1.0, true)
+                return (0.0, true)
             } else if currentWeight > targetWeight {
                 // Above target weight
-                return (0.0, false)
+                return (1.0, false)
             } else {
                 // Between starting and target
                 let totalRange = targetWeight - startingWeight
@@ -105,6 +122,12 @@ struct SimpleEntry: TimelineEntry {
             }
         }
     }
+}
+
+struct ExerciseGoalData: Codable {
+    let type: String
+    let progress: Double
+    let details: String
 }
 
 struct ClimbingTrackerWidgetEntryView : View {
@@ -152,10 +175,9 @@ struct ClimbingTrackerWidgetEntryView : View {
                             .foregroundColor(Color(.systemGray5))
                         
                         // Progress bar
-                        let progress = entry.targetTrainingsPerWeek > 0 ? Double(entry.trainingsLast7Days) / Double(entry.targetTrainingsPerWeek) : 0
                         RoundedRectangle(cornerRadius: 2)
-                            .frame(width: min(CGFloat(progress) * geometry.size.width, geometry.size.width), height: 6)
-                            .foregroundColor(progress >= 1.0 ? .green : .blue)
+                            .frame(width: min(CGFloat(entry.trainingProgress) * geometry.size.width, geometry.size.width), height: 6)
+                            .foregroundColor(entry.trainingProgress >= 1.0 ? .green : .blue)
                             .shadow(color: .blue.opacity(0.3), radius: 1, x: 0, y: 1)
                     }
                 }
@@ -206,6 +228,49 @@ struct ClimbingTrackerWidgetEntryView : View {
                     }
                 }
             }
+            
+            // Exercise Goals Section
+            if !entry.exerciseGoals.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "figure.climbing")
+                            .font(.system(size: 11))
+                            .foregroundColor(.purple)
+                        Text("Exercise Goals")
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    
+                    ForEach(entry.exerciseGoals.prefix(2), id: \.type) { goal in
+                        HStack(spacing: 2) {
+                            Text(goal.type)
+                                .font(.system(size: 10))
+                                .lineLimit(1)
+                            Spacer()
+                            Text("\(Int(goal.progress * 100))%")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.purple)
+                        }
+                        
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                // Background track
+                                RoundedRectangle(cornerRadius: 2)
+                                    .frame(width: geometry.size.width, height: 4)
+                                    .foregroundColor(Color(.systemGray5))
+                                
+                                // Progress bar
+                                RoundedRectangle(cornerRadius: 2)
+                                    .frame(width: min(CGFloat(goal.progress) * geometry.size.width, geometry.size.width), height: 4)
+                                    .foregroundColor(.purple)
+                                    .shadow(color: .purple.opacity(0.3), radius: 1, x: 0, y: 1)
+                            }
+                        }
+                        .frame(height: 4)
+                    }
+                }
+            }
         }
         .padding(.horizontal, 10)
         .padding(.top, 16)
@@ -238,5 +303,5 @@ struct ClimbingTrackerWidget: Widget {
 #Preview(as: .systemSmall) {
     ClimbingTrackerWidget()
 } timeline: {
-    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 75.5, targetWeight: 72.0, startingWeight: 70.0)
+    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 75.5, targetWeight: 72.0, startingWeight: 70.0, exerciseGoals: [])
 }

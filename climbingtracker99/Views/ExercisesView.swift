@@ -90,6 +90,8 @@ struct ExercisesView: View {
                 exercise.focus = .strength
             case .flexibility:
                 exercise.focus = .mobility
+            case .running:
+                exercise.focus = .endurance
             }
         }
     }
@@ -205,6 +207,14 @@ struct ExerciseDetailsView: View {
                 
                 if !areas.isEmpty {
                     Text(areas.joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            case .running:
+                if let hours = exercise.hours,
+                   let minutes = exercise.minutes,
+                   let distance = exercise.distance {
+                    Text("\(hours)h \(minutes)m × \(String(format: "%.2f", distance))km")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

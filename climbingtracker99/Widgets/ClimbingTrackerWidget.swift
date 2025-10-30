@@ -8,9 +8,22 @@ struct Provider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
         // Get data from shared UserDefaults
-        let userDefaults = UserDefaults(suiteName: "group.com.yourdomain.climbingtracker99")
+        let userDefaults = UserDefaults(suiteName: "group.com.ivoyovchev.climbingtracker99")
         
-        let trainingsLast7Days = userDefaults?.integer(forKey: "trainingsLast7Days") ?? 0
+        // Get the start of the current week (Monday)
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToSubtract = (weekday + 5) % 7 // Convert to Monday-based week (1 = Sunday, 2 = Monday, etc.)
+        let startOfWeek = calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!
+        
+        // Get the end of the current week (Sunday)
+        let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek)!
+        
+        // Get trainings from the current week
+        let trainings = Training.fetchTrainings(from: startOfWeek, to: endOfWeek)
+        let trainingsLast7Days = trainings.count
+        
         let targetTrainingsPerWeek = userDefaults?.integer(forKey: "targetTrainingsPerWeek") ?? 0
         let currentWeight = userDefaults?.double(forKey: "currentWeight") ?? 0
         let targetWeight = userDefaults?.double(forKey: "targetWeight") ?? 0
@@ -27,9 +40,22 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         // Get data from shared UserDefaults
-        let userDefaults = UserDefaults(suiteName: "group.com.yourdomain.climbingtracker99")
+        let userDefaults = UserDefaults(suiteName: "group.com.ivoyovchev.climbingtracker99")
         
-        let trainingsLast7Days = userDefaults?.integer(forKey: "trainingsLast7Days") ?? 0
+        // Get the start of the current week (Monday)
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToSubtract = (weekday + 5) % 7 // Convert to Monday-based week (1 = Sunday, 2 = Monday, etc.)
+        let startOfWeek = calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!
+        
+        // Get the end of the current week (Sunday)
+        let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek)!
+        
+        // Get trainings from the current week
+        let trainings = Training.fetchTrainings(from: startOfWeek, to: endOfWeek)
+        let trainingsLast7Days = trainings.count
+        
         let targetTrainingsPerWeek = userDefaults?.integer(forKey: "targetTrainingsPerWeek") ?? 0
         let currentWeight = userDefaults?.double(forKey: "currentWeight") ?? 0
         let targetWeight = userDefaults?.double(forKey: "targetWeight") ?? 0

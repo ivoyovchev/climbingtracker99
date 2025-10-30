@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import WidgetKit
 
 @main
 struct climbingtracker99App: App {
@@ -14,19 +15,146 @@ struct climbingtracker99App: App {
     
     init() {
         do {
-            modelContainer = try ModelContainer(
-                for: WeightEntry.self, 
-                UserSettings.self, 
+            let schema = Schema([
+                WeightEntry.self,
+                UserSettings.self,
                 Item.self,
                 Training.self,
                 Goals.self,
+                ExerciseGoal.self,
                 Media.self,
                 Exercise.self,
                 RecordedExercise.self,
                 Meal.self
-            )
+            ])
+            
+            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            
+            do {
+                modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            } catch {
+                // If we can't load the existing store, create a new one
+                print("Error loading store: \(error)")
+                let storeURL = URL.documentsDirectory.appending(path: "default.store")
+                try? FileManager.default.removeItem(at: storeURL)
+                modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            }
+            
+            // Update widget data on app launch
+            updateWidgetData()
         } catch {
             fatalError("Could not initialize ModelContainer: \(error)")
+        }
+    }
+    
+    private func updateWidgetData() {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
+            print("Failed to get container URL")
+            return
+        }
+        
+        // Ensure the container directory exists
+        do {
+            try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+        } catch {
+            print("Failed to create container directory: \(error.localizedDescription)")
+            return
+        }
+        
+        let fileURL = containerURL.appendingPathComponent("widgetData.json")
+        
+        // Get the model context
+        let context = ModelContext(modelContainer)
+        
+        // Fetch trainings from the last 7 days
+        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let descriptor = FetchDescriptor<Training>(
+            predicate: #Predicate<Training> { training in
+                training.date >= sevenDaysAgo
+            }
+        )
+        
+        do {
+            let recentTrainings = try context.fetch(descriptor)
+            
+            // Fetch goals
+            let goalsDescriptor = FetchDescriptor<Goals>()
+            let goals = try context.fetch(goalsDescriptor).first ?? Goals()
+            
+            // Fetch current weight
+            let weightDescriptor = FetchDescriptor<WeightEntry>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+            let currentWeight = try context.fetch(weightDescriptor).first?.weight ?? 0.0
+            
+            // Process exercise goals
+            var exerciseGoalsData: [[String: Any]] = []
+            for goal in goals.exerciseGoals {
+                var progress: Double = 0
+                var details: String = ""
+                
+                if goal.exerciseType == .hangboarding {
+                    let currentDuration = goal.getCurrentValue("duration") ?? 0
+                    let targetDuration = goal.getTargetValue("duration") ?? 1
+                    progress = currentDuration / targetDuration
+                    
+                    var detailsArray: [String] = []
+                    if let gripTypeString = goal.getParameterValue("gripType") as String?,
+                       let gripType = GripType(rawValue: gripTypeString) {
+                        detailsArray.append(gripType.rawValue)
+                    }
+                    if let edgeSize = goal.getParameterValue("edgeSize") as Int? {
+                        detailsArray.append("\(edgeSize)mm")
+                    }
+                    if let duration = goal.getTargetValue("duration") {
+                        detailsArray.append("\(Int(duration))s")
+                    }
+                    if let weight = goal.getTargetValue("addedWeight"), weight > 0 {
+                        detailsArray.append("+\(weight)kg")
+                    }
+                    details = detailsArray.joined(separator: " • ")
+                } else if goal.exerciseType == .repeaters {
+                    let currentReps = goal.getCurrentValue("repetitions") ?? 0
+                    let targetReps = goal.getTargetValue("repetitions") ?? 1
+                    progress = currentReps / targetReps
+                    
+                    var detailsArray: [String] = []
+                    if let duration = goal.getTargetValue("duration") {
+                        detailsArray.append("\(Int(duration))s")
+                    }
+                    if let reps = goal.getTargetValue("repetitions") {
+                        detailsArray.append("\(Int(reps)) reps")
+                    }
+                    if let sets = goal.getTargetValue("sets") {
+                        detailsArray.append("\(Int(sets)) sets")
+                    }
+                    if let weight = goal.getTargetValue("addedWeight"), weight > 0 {
+                        detailsArray.append("+\(weight)kg")
+                    }
+                    details = detailsArray.joined(separator: " • ")
+                }
+                
+                exerciseGoalsData.append([
+                    "type": goal.exerciseType.rawValue,
+                    "progress": progress,
+                    "details": details
+                ])
+            }
+            
+            let data = [
+                "trainingsLast7Days": recentTrainings.count,
+                "targetTrainingsPerWeek": goals.targetTrainingsPerWeek,
+                "currentWeight": currentWeight,
+                "targetWeight": goals.targetWeight,
+                "startingWeight": goals.startingWeight ?? 0.0,
+                "exerciseGoals": exerciseGoalsData
+            ] as [String : Any]
+            
+            let jsonData = try JSONSerialization.data(withJSONObject: data)
+            try jsonData.write(to: fileURL, options: .atomic)
+            
+            // Force a widget update
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            print("Failed to update widget data: \(error.localizedDescription)")
         }
     }
     
@@ -105,7 +233,11 @@ struct AppContentView: View {
     }
     
     private func createDefaultGoals() {
-        let defaultGoals = Goals(targetTrainingsPerWeek: 3, targetWeight: 0.0)
+        let defaultGoals = Goals(
+            targetTrainingsPerWeek: 3,
+            targetWeight: 0.0,
+            exerciseGoals: []
+        )
         modelContext.insert(defaultGoals)
     }
 }

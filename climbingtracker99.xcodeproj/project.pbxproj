@@ -62,6 +62,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4AAFAFEA2EB3D9D500921C2B /* Exceptions for "climbingtracker99" folder in "climbingtracker99" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4ACADD0D2DB17C4E0084939F /* climbingtracker99 */;
+		};
 		4ACADD852DB1AEDE0084939F /* Exceptions for "ClimbingTrackerWidget" folder in "ClimbingTrackerWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -74,6 +81,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4ACADD102DB17C4E0084939F /* climbingtracker99 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4AAFAFEA2EB3D9D500921C2B /* Exceptions for "climbingtracker99" folder in "climbingtracker99" target */,
+			);
 			path = climbingtracker99;
 			sourceTree = "<group>";
 		};
@@ -524,8 +534,11 @@
 				DEVELOPMENT_TEAM = UWUAQ5RCV7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = climbingtracker99/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Climbing Tracker";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "ClimbingTracker reads weight, sleep, heart rate and energy data to show trends and insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "ClimbingTracker may write health data you choose to log.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -556,8 +569,11 @@
 				DEVELOPMENT_TEAM = UWUAQ5RCV7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = climbingtracker99/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Climbing Tracker";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "ClimbingTracker reads weight, sleep, heart rate and energy data to show trends and insights.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "ClimbingTracker may write health data you choose to log.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

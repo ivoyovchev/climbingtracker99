@@ -103,6 +103,132 @@ class ExerciseFormViewModel: ObservableObject {
             }
         )
     }
+    
+    func createRepetitionsBinding() -> Binding<Double> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return Double(self.recordedExercise?.repetitions ?? self.exercise.repetitions ?? 10)
+                }
+                return Double(self.exercise.repetitions ?? 10)
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateRepetitions(Int(newValue))
+                } else {
+                    self.exercise.repetitions = Int(newValue)
+                }
+            }
+        )
+    }
+    
+    func createHoursBinding() -> Binding<Int> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return self.recordedExercise?.hours ?? 0
+                }
+                return 0
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateHours(newValue)
+                } else {
+                    self.exercise.hours = newValue
+                }
+            }
+        )
+    }
+    
+    func createMinutesBinding() -> Binding<Int> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return self.recordedExercise?.minutes ?? 0
+                }
+                return 0
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateMinutes(newValue)
+                } else {
+                    self.exercise.minutes = newValue
+                }
+            }
+        )
+    }
+    
+    func createDistanceBinding() -> Binding<Double> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return self.recordedExercise?.distance ?? 0
+                }
+                return 0
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateDistance(newValue)
+                } else {
+                    self.exercise.distance = newValue
+                }
+            }
+        )
+    }
+    
+    func createRoutesBinding() -> Binding<Double> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return Double(self.recordedExercise?.routes ?? self.exercise.routes ?? 5)
+                }
+                return Double(self.exercise.routes ?? 5)
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateRoutes(Int(newValue))
+                } else {
+                    self.exercise.routes = Int(newValue)
+                }
+            }
+        )
+    }
+    
+    func createAttemptsBinding() -> Binding<Double> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return Double(self.recordedExercise?.attempts ?? self.exercise.attempts ?? 5)
+                }
+                return Double(self.exercise.attempts ?? 5)
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateAttempts(Int(newValue))
+                } else {
+                    self.exercise.attempts = Int(newValue)
+                }
+            }
+        )
+    }
+    
+    func createMovesBinding() -> Binding<Double> {
+        Binding(
+            get: {
+                if self.isRecording {
+                    return Double(self.recordedExercise?.moves ?? self.exercise.moves ?? 15)
+                }
+                return Double(self.exercise.moves ?? 15)
+            },
+            set: { newValue in
+                if self.isRecording {
+                    self.recordedExercise?.updateMoves(Int(newValue))
+                } else {
+                    self.exercise.moves = Int(newValue)
+                }
+            }
+        )
+    }
 }
 
 // MARK: - Stepper Component
@@ -325,6 +451,8 @@ struct ExerciseFormView: View {
                 maxHangsSection
             case .flexibility:
                 flexibilitySection
+            case .running:
+                runningSection
             }
         }
     }
@@ -362,8 +490,8 @@ struct ExerciseFormView: View {
                 
                 ExerciseStepper(
                     title: "Repetitions",
-                    value: viewModel.createSetsBinding().wrappedValue,
-                    binding: viewModel.createSetsBinding(),
+                    value: viewModel.createRepetitionsBinding().wrappedValue,
+                    binding: viewModel.createRepetitionsBinding(),
                     range: 1...20
                 )
                 
@@ -397,8 +525,8 @@ struct ExerciseFormView: View {
             
             ExerciseStepper(
                 title: "Repetitions",
-                value: viewModel.createSetsBinding().wrappedValue,
-                binding: viewModel.createSetsBinding(),
+                value: viewModel.createRepetitionsBinding().wrappedValue,
+                binding: viewModel.createRepetitionsBinding(),
                 range: 1...20
             )
             
@@ -440,15 +568,15 @@ struct ExerciseFormView: View {
             Section(header: Text("Parameters")) {
                 ExerciseStepper(
                     title: "Routes",
-                    value: viewModel.createSetsBinding().wrappedValue,
-                    binding: viewModel.createSetsBinding(),
+                    value: viewModel.createRoutesBinding().wrappedValue,
+                    binding: viewModel.createRoutesBinding(),
                     range: 1...20
                 )
                 
                 ExerciseStepper(
                     title: "Attempts",
-                    value: viewModel.createSetsBinding().wrappedValue,
-                    binding: viewModel.createSetsBinding(),
+                    value: viewModel.createAttemptsBinding().wrappedValue,
+                    binding: viewModel.createAttemptsBinding(),
                     range: 1...10
                 )
                 
@@ -509,8 +637,8 @@ struct ExerciseFormView: View {
         Section(header: Text("Parameters")) {
             ExerciseStepper(
                 title: "Moves",
-                value: viewModel.createSetsBinding().wrappedValue,
-                binding: viewModel.createSetsBinding(),
+                value: viewModel.createMovesBinding().wrappedValue,
+                binding: viewModel.createMovesBinding(),
                 range: 1...40
             )
             
@@ -765,6 +893,49 @@ struct ExerciseFormView: View {
             Toggle("Hips", isOn: hipsBinding)
             Toggle("Forearms", isOn: forearmsBinding)
             Toggle("Legs", isOn: legsBinding)
+        }
+    }
+    
+    private var runningSection: some View {
+        Section(header: Text("Parameters")) {
+            HStack {
+                Text("Time")
+                Spacer()
+                HStack(spacing: 8) {
+                    Picker("", selection: viewModel.createHoursBinding()) {
+                        ForEach(0...12, id: \.self) { hour in
+                            Text("\(hour)").tag(hour)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(width: 50, height: 80)
+                    
+                    Text(":")
+                        .foregroundColor(.secondary)
+                    
+                    Picker("", selection: viewModel.createMinutesBinding()) {
+                        ForEach(0...59, id: \.self) { minute in
+                            Text(String(format: "%02d", minute)).tag(minute)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(width: 50, height: 80)
+                }
+            }
+            
+            HStack {
+                Text("Distance")
+                Spacer()
+                Picker("", selection: viewModel.createDistanceBinding()) {
+                    ForEach(Array(stride(from: 0.0, through: 42.2, by: 0.1)), id: \.self) { distance in
+                        Text(String(format: "%.1f", distance)).tag(distance)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(width: 80, height: 80)
+                Text("km")
+                    .foregroundColor(.secondary)
+            }
         }
     }
 } 
