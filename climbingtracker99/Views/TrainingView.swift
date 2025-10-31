@@ -25,6 +25,7 @@ public struct TrainingView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Training.date, order: .reverse) private var trainings: [Training]
     @State private var showingAddTraining = false
+    @State private var showingRecordTraining = false
     @State private var trainingToEdit: Training?
     
     public init() {}
@@ -33,7 +34,15 @@ public struct TrainingView: View {
         NavigationView {
             VStack(spacing: 20) {
                 TabHeaderView(title: "Training") {
-                    Button(action: { showingAddTraining = true }) {
+                    Menu {
+                        Button(action: { showingAddTraining = true }) {
+                            Label("Log Training", systemImage: "pencil")
+                        }
+                        
+                        Button(action: { showingRecordTraining = true }) {
+                            Label("Record Training", systemImage: "record.circle")
+                        }
+                    } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 24))
                     }
@@ -44,6 +53,9 @@ public struct TrainingView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showingAddTraining) {
                 TrainingEditView()
+            }
+            .fullScreenCover(isPresented: $showingRecordTraining) {
+                RecordTrainingView()
             }
             .sheet(item: $trainingToEdit) { training in
                 TrainingEditView(training: training)
@@ -709,12 +721,12 @@ struct ExerciseDetails: View {
                 BoardClimbingDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .edgePickups:
                 EdgePickupsDetails(exercise: exercise, recordedExercise: recordedExercise)
-            case .maxHangs:
-                MaxHangsDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .flexibility:
                 FlexibilityDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .running:
                 RunningDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .warmup:
+                WarmupDetails(exercise: exercise, recordedExercise: recordedExercise)
             }
         }
     }
@@ -941,6 +953,26 @@ struct RunningDetails: View {
             .font(.system(size: 11))
             .foregroundColor(.secondary)
             .lineLimit(1)
+    }
+}
+
+struct WarmupDetails: View {
+    let exercise: Exercise
+    let recordedExercise: RecordedExercise?
+    
+    var body: some View {
+        if let recorded = recordedExercise, !recorded.selectedDetailOptions.isEmpty {
+            Text(recorded.selectedDetailOptions.joined(separator: ", "))
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else {
+            let duration = recordedExercise?.duration ?? exercise.duration ?? 10
+            Text("\(duration) min")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
     }
 }
 

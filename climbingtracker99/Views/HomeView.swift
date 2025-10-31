@@ -184,13 +184,6 @@ struct HomeView: View {
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
         let recentTrainings = trainings.filter { $0.date >= sevenDaysAgo }.count
         
-        // Calculate weight progress for widget
-        let weightProgress = calculateWeightProgress(
-            current: currentWeight ?? 0,
-            starting: userGoals.startingWeight ?? 0,
-            target: userGoals.targetWeight
-        )
-        
         // Process exercise goals
         var exerciseGoalsData: [[String: Any]] = []
         for goal in userGoals.exerciseGoals {

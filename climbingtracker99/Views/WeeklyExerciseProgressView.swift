@@ -114,12 +114,12 @@ struct ExerciseDetailRow: View {
                 BoardClimbingRow(exercise: exercise)
             case .edgePickups:
                 EdgePickupsRow(exercise: exercise)
-            case .maxHangs:
-                MaxHangsRow(exercise: exercise)
             case .flexibility:
                 FlexibilityRow(exercise: exercise)
             case .running:
                 RunningRow(exercise: exercise)
+            case .warmup:
+                WarmupRow(exercise: exercise)
             }
         }
         .padding(.vertical, 4)
@@ -390,6 +390,24 @@ struct RunningRow: View {
             }
             if let distance = exercise.distance {
                 Text("\(String(format: "%.2f", distance))km")
+            }
+        }
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+    }
+}
+
+struct WarmupRow: View {
+    let exercise: RecordedExercise
+    
+    var body: some View {
+        HStack {
+            if !exercise.selectedDetailOptions.isEmpty {
+                Text(exercise.selectedDetailOptions.joined(separator: ", "))
+            } else if let duration = exercise.recordedDuration {
+                Text("\(duration)s")
+            } else if let duration = exercise.duration {
+                Text("\(duration) min")
             }
         }
         .font(.subheadline)

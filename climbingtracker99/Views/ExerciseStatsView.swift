@@ -84,12 +84,12 @@ struct ExerciseStatsCard: View {
                 BoardClimbingStats(trainings: trainings, focus: focus)
             case .edgePickups:
                 EdgePickupsStats(trainings: trainings, focus: focus)
-            case .maxHangs:
-                MaxHangsStats(trainings: trainings, focus: focus)
             case .flexibility:
                 FlexibilityStats(trainings: trainings, focus: focus)
             case .running:
                 RunningStats(trainings: trainings, focus: focus)
+            case .warmup:
+                WarmupStats(trainings: trainings, focus: focus)
             }
         }
         .padding()
@@ -391,7 +391,7 @@ struct MaxHangsStats: View {
         VStack(alignment: .leading) {
             let minEdgeSize = trainings.flatMap { $0.recordedExercises }
                 .filter { 
-                    $0.exercise.type == .maxHangs && 
+                    $0.exercise.type == .hangboarding && 
                     $0.exercise.focus == focus 
                 }
                 .compactMap { $0.edgeSize }
@@ -484,6 +484,58 @@ struct RunningStats: View {
                         .font(.subheadline)
                     Spacer()
                     Text("\(totalDuration / 60)h \(totalDuration % 60)m")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+struct WarmupStats: View {
+    let trainings: [Training]
+    let focus: TrainingFocus
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            let warmupExercises = trainings.flatMap { $0.recordedExercises }
+                .filter { 
+                    $0.exercise.type == .warmup && 
+                    $0.exercise.focus == focus 
+                }
+            
+            let durations = warmupExercises.compactMap { exercise -> Int? in
+                if let recorded = exercise.recordedDuration {
+                    return recorded
+                } else if let duration = exercise.duration {
+                    return duration * 60
+                }
+                return nil
+            }
+            
+            let avgDuration = durations.isEmpty ? 0.0 : Double(durations.reduce(0, +)) / Double(durations.count)
+            
+            let allDetails = warmupExercises.flatMap { $0.selectedDetailOptions }
+            let uniqueDetails = Set(allDetails)
+            
+            if !uniqueDetails.isEmpty {
+                HStack {
+                    Text("Detail Areas")
+                        .font(.subheadline)
+                    Spacer()
+                    Text(uniqueDetails.joined(separator: ", "))
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .lineLimit(2)
+                }
+            }
+            
+            if avgDuration > 0 {
+                HStack {
+                    Text("Avg Duration")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(Int(avgDuration))s")
                         .font(.subheadline)
                         .foregroundColor(.blue)
                 }

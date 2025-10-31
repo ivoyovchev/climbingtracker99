@@ -86,12 +86,12 @@ struct ExercisesView: View {
                 exercise.focus = .technique
             case .edgePickups:
                 exercise.focus = .strength
-            case .maxHangs:
-                exercise.focus = .strength
             case .flexibility:
                 exercise.focus = .mobility
             case .running:
                 exercise.focus = .endurance
+            case .warmup:
+                exercise.focus = .mobility
             }
         }
     }
@@ -188,7 +188,7 @@ struct ExerciseDetailsView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-            case .maxHangs:
+            case .hangboarding:
                 if let duration = exercise.duration,
                    let sets = exercise.sets,
                    let weight = exercise.addedWeight,
@@ -215,6 +215,12 @@ struct ExerciseDetailsView: View {
                    let minutes = exercise.minutes,
                    let distance = exercise.distance {
                     Text("\(hours)h \(minutes)m × \(String(format: "%.2f", distance))km")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            case .warmup:
+                if let duration = exercise.duration {
+                    Text("\(duration) min")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

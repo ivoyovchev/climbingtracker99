@@ -447,12 +447,12 @@ struct ExerciseFormView: View {
                 boardClimbingSection
             case .edgePickups:
                 edgePickupsSection
-            case .maxHangs:
-                maxHangsSection
             case .flexibility:
                 flexibilitySection
             case .running:
                 runningSection
+            case .warmup:
+                warmupSection
             }
         }
     }
@@ -671,8 +671,8 @@ struct ExerciseFormView: View {
             
             ExerciseStepper(
                 title: "Repetitions",
-                value: viewModel.createSetsBinding().wrappedValue,
-                binding: viewModel.createSetsBinding(),
+                value: viewModel.createRepetitionsBinding().wrappedValue,
+                binding: viewModel.createRepetitionsBinding(),
                 range: 1...20
             )
             
@@ -705,8 +705,8 @@ struct ExerciseFormView: View {
             
             ExerciseStepper(
                 title: "Repetitions",
-                value: viewModel.createSetsBinding().wrappedValue,
-                binding: viewModel.createSetsBinding(),
+                value: viewModel.createRepetitionsBinding().wrappedValue,
+                binding: viewModel.createRepetitionsBinding(),
                 range: 1...50
             )
             
@@ -739,8 +739,8 @@ struct ExerciseFormView: View {
             
             ExerciseStepper(
                 title: "Repetitions",
-                value: viewModel.createSetsBinding().wrappedValue,
-                binding: viewModel.createSetsBinding(),
+                value: viewModel.createRepetitionsBinding().wrappedValue,
+                binding: viewModel.createRepetitionsBinding(),
                 range: 1...50
             )
             
@@ -776,12 +776,14 @@ struct ExerciseFormView: View {
             )
             
             Picker("Grade Sent", selection: gradeBinding) {
+                Text("Select grade").tag(nil as String?)
                 ForEach(["5+", "6A", "6A+", "6B", "6B+", "6C", "6C+", "7A", "7A+", "7B", "7B+", "7C", "7C+", "8A"], id: \.self) { grade in
                     Text(grade).tag(grade as String?)
                 }
             }
             
             Picker("Grade Tried", selection: gradeTriedBinding) {
+                Text("Select grade").tag(nil as String?)
                 ForEach(["5+", "6A", "6A+", "6B", "6B+", "6C", "6C+", "7A", "7A+", "7B", "7B+", "7C", "7C+", "8A"], id: \.self) { grade in
                     Text(grade).tag(grade as String?)
                 }
@@ -936,6 +938,17 @@ struct ExerciseFormView: View {
                 Text("km")
                     .foregroundColor(.secondary)
             }
+        }
+    }
+    
+    private var warmupSection: some View {
+        Section(header: Text("Parameters")) {
+            ExerciseStepper(
+                title: "Duration",
+                value: viewModel.createDurationBinding().wrappedValue,
+                binding: viewModel.createDurationBinding(),
+                range: 1...60
+            )
         }
     }
 } 

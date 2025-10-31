@@ -213,6 +213,7 @@ struct AppContentView: View {
     private func createDefaultExercises() {
         // Create default exercises for each type with appropriate focuses
         let defaultExercises = [
+            Exercise(type: .warmup, focus: .mobility),
             Exercise(type: .hangboarding, focus: .strength),
             Exercise(type: .repeaters, focus: .endurance),
             Exercise(type: .limitBouldering, focus: .power),
@@ -223,8 +224,8 @@ struct AppContentView: View {
             Exercise(type: .pullups, focus: .strength),
             Exercise(type: .boardClimbing, focus: .technique),
             Exercise(type: .edgePickups, focus: .strength),
-            Exercise(type: .maxHangs, focus: .strength),
-            Exercise(type: .flexibility, focus: .mobility)
+            Exercise(type: .flexibility, focus: .mobility),
+            Exercise(type: .running, focus: .endurance)
         ]
         
         for exercise in defaultExercises {

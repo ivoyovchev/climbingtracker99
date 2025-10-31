@@ -44,6 +44,44 @@ final class RecordedExercise: ObservableObject {
     var minutes: Int?
     var distance: Double?
     
+    // Live recording timing fields
+    var recordedStartTime: Date?
+    var recordedEndTime: Date?
+    var recordedDuration: Int? // in seconds
+    var pausedDuration: Int = 0 // total paused time in seconds
+    var isCompleted: Bool = false
+    var selectedDetailOptionsData: String = "" // JSON array of strings, e.g., ["Arms", "Fingers"] for Warmup
+    
+    // Pullups set tracking (stored as JSON string)
+    var pullupSetsData: String = "" // JSON array of {reps: Int, weight: Int, restDuration: Int}
+    
+    // NxN set tracking (stored as JSON string)
+    var nxnSetsData: String = "" // JSON array of {problems: Int, completed: Bool, restDuration: Int, grades: [String]}
+    
+    // Board climbing route tracking (stored as JSON string)
+    var boardClimbingRoutesData: String = "" // JSON array of {boardType: String, grade: String, tries: Int, sent: Bool}
+    
+    // Shoulder lifts set tracking (stored as JSON string)
+    var shoulderLiftsSetsData: String = "" // JSON array of {reps: Int, weight: Int, restDuration: Int}
+    
+    // Repeaters set tracking (stored as JSON string)
+    var repeatersSetsData: String = "" // JSON array of {edgeSize: Int, hangTime: Int, restTime: Int, repeats: Int, addedWeight: Int, completed: Bool}
+    
+    // Edge pickups set tracking (stored as JSON string)
+    var edgePickupsSetsData: String = "" // JSON array of {edgeSize: Int, hangTime: Int, restTime: Int, repeats: Int, gripType: String, addedWeight: Int, completed: Bool}
+    
+    // Limit bouldering route tracking (stored as JSON string)
+    var limitBoulderingRoutesData: String = "" // JSON array of {boulderType: String, grade: String, tries: Int, sent: Bool, name: String?}
+    
+    // Max Hangs set tracking (stored as JSON string)
+    var maxHangsSetsData: String = "" // JSON array of {edgeSize: Int, duration: Int, restDuration: Int, addedWeight: Int}
+    
+    // Boulder Campus set tracking (stored as JSON string)
+    var boulderCampusSetsData: String = "" // JSON array of {moves: Int, restDuration: Int}
+    
+    // Deadlifts set tracking (stored as JSON string)
+    var deadliftsSetsData: String = "" // JSON array of {reps: Int, weight: Int, restDuration: Int}
+    
     // ObservableObject conformance - marked as non-persisted
     @Transient
     var objectWillChange = PassthroughSubject<Void, Never>()
@@ -152,6 +190,25 @@ final class RecordedExercise: ObservableObject {
     func updateDistance(_ value: Double?) {
         update(\.distance, value: value)
     }
+    
+    // Computed property for selectedDetailOptions (converted from/to JSON)
+    var selectedDetailOptions: [String] {
+        get {
+            guard !selectedDetailOptionsData.isEmpty,
+                  let data = selectedDetailOptionsData.data(using: .utf8),
+                  let array = try? JSONDecoder().decode([String].self, from: data) else {
+                return []
+            }
+            return array
+        }
+        set {
+            if let jsonData = try? JSONEncoder().encode(newValue),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                selectedDetailOptionsData = jsonString
+                objectWillChange.send()
+            }
+        }
+    }
 }
 
 @Model
@@ -164,9 +221,16 @@ final class Training {
     var notes: String
     var media: [Media]
     
+    // Live recording fields
+    var isRecorded: Bool = false // true if this was recorded live
+    var recordingStartTime: Date?
+    var recordingEndTime: Date?
+    var totalRecordedDuration: Int? // in seconds
+    
     init(date: Date = Date(), duration: Int = 60, location: TrainingLocation = .indoor, 
          focus: TrainingFocus = .strength, recordedExercises: [RecordedExercise] = [], 
-         notes: String = "", media: [Media] = []) {
+         notes: String = "", media: [Media] = [], isRecorded: Bool = false,
+         recordingStartTime: Date? = nil) {
         self.date = date
         self.duration = duration
         self.location = location
@@ -174,6 +238,8 @@ final class Training {
         self.recordedExercises = recordedExercises
         self.notes = notes
         self.media = media
+        self.isRecorded = isRecorded
+        self.recordingStartTime = recordingStartTime ?? (isRecorded ? Date() : nil)
     }
     
     static func fetchTrainings(from startDate: Date, to endDate: Date) -> [Training] {

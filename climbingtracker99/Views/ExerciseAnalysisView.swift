@@ -82,9 +82,9 @@ private struct ExerciseParameterTrendsView: View {
         case .pullups: return ["addedWeight", "repetitions", "sets"]
         case .boardClimbing: return ["routes"]
         case .edgePickups: return ["duration", "sets", "addedWeight", "edgeSize"]
-        case .maxHangs: return ["duration", "addedWeight", "edgeSize"]
         case .flexibility: return []
         case .running: return ["distance", "minutes"]
+        case .warmup: return ["recordedDuration", "duration"]
         }
     }
     
@@ -105,6 +105,7 @@ private struct ExerciseParameterTrendsView: View {
             let h = rec.hours ?? 0
             let m = rec.minutes ?? 0
             return Double(h * 60 + m)
+        case "recordedDuration": return rec.recordedDuration.flatMap { Double($0) }
         default: return nil
         }
     }
