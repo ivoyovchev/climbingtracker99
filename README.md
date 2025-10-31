@@ -2,9 +2,10 @@
 
 A comprehensive climbing training and progress tracking app for iOS.
 
-## Version 1.0.7
+## Version 2.0.0
 
-### Features
+### Major Features
+- **Live Record Training** - Record workouts in real-time with automatic timers
 - Track your climbing training sessions
 - Record and analyze different types of exercises
 - Monitor your weight and health metrics
@@ -13,7 +14,30 @@ A comprehensive climbing training and progress tracking app for iOS.
 - View detailed statistics and progress
 - Widget support for quick access to key metrics
 
-### Recent Updates
+### Record Training Feature (v2.0.0)
+The new Record Training feature allows you to track workouts live with detailed exercise-specific timers:
+
+- **Live Workout Timer** - Continuous timer that tracks your entire workout session
+- **Exercise-Specific Timers:**
+  - **Flexibility** - Track time for specific body areas (Arms, Fingers, Back, Legs, Mobility, Core)
+  - **Pull-ups** - Track sets with repetitions, added weight, and automatic rest timers
+  - **N x Ns** - Track climbing/rest phases with problem completion tracking and grade logging
+  - **Board Climbing** - Track routes with board type (MoonBoard, KilterBoard, FrankieBoard), grade, tries, and sent status
+  - **Shoulder Lifts** - Track sets with reps, weight, and automatic rest timers with sound cues
+  - **Repeaters** - Full countdown timers with hang/rest phases, edge size selection, and sound cues
+  - **Edge Pickups** - Similar to Repeaters with grip type selection (Open hand, Half Crimp)
+  - **Limit Bouldering** - Track boulder problems with indoor/outdoor type, grade, tries, sent status, and optional names
+  - **Max Hangs** - Automatic execution with configurable edge size, hang duration, rest duration, sets, and added weight. Includes 15-second prep timer before first hang
+  - **Boulder Campus** - Track sets with number of moves and rest between sets
+  - **Deadlifts** - Track sets with weight, repetitions, and rest between sets
+
+- **Full-Screen Recording Interface** - Prevents accidental dismissal with confirmation dialog
+- **Automatic Rest Timers** - Configurable rest periods with countdown timers
+- **Sound Cues** - Audio feedback for timed exercises (Repeaters, Edge Pickups, Max Hangs)
+- **Detailed Set Tracking** - Save and review all sets with complete statistics
+- **Progress Tracking** - Summary statistics including totals, averages, and progress metrics
+
+### Previous Updates
 - Updated widget UI for a cleaner, flatter design with improved spacing and alignment
 - Improved widget design with climbing-specific icons
 - Enhanced dashboard view with consistent title styling
@@ -40,10 +64,20 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Features
 
 ### Training Tracking
-- Record and manage climbing training sessions
-- Track exercise progress and statistics
+- **Log Training** - Record completed training sessions after the fact
+- **Record Training** - Live workout recording with real-time timers and exercise-specific tracking
+- Track exercise progress and statistics with detailed metrics
 - Set and monitor weekly training goals
 - View training history and trends
+- Exercise-specific data tracking:
+  - Max Hangs: Edge size, hang duration, rest duration, sets, added weight
+  - Repeaters/Edge Pickups: Edge size, hang time, rest time, repeats per set, number of sets, grip type (Edge Pickups)
+  - Board Climbing: Board type, grade, tries, sent status
+  - Limit Bouldering: Boulder type (indoor/outdoor), grade, tries, sent status, optional name
+  - Pull-ups/Deadlifts/Shoulder Lifts: Sets, repetitions, weight, rest between sets
+  - N x Ns: Problems per set, number of sets, rest duration, grade tracking
+  - Boulder Campus: Sets, number of moves, rest between sets
+  - Flexibility: Area-specific time tracking (Arms, Fingers, Back, Legs, Mobility, Core)
 
 ### Health Monitoring
 - Track weight changes over time

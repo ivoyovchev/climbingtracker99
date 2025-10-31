@@ -4,6 +4,6 @@
 import Foundation
 
 public enum SharedConstants {
-    public static let APP_VERSION = "1.0.7"
+    public static let APP_VERSION = "2.0.0"
     public static let APP_GROUP_IDENTIFIER = "group.com.tornado-studios.climbingtracker99"
 }

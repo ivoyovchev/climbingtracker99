@@ -4,7 +4,7 @@
 
 **Climbing Tracker 99** is a comprehensive iOS application for tracking climbing training sessions, health metrics, nutrition, and progress toward fitness goals. Built with SwiftUI and SwiftData, it provides a modern, native iOS experience with widget support and HealthKit integration.
 
-**Current Version:** 1.0.7  
+**Current Version:** 2.0.0  
 **Target Platform:** iOS 17.0+  
 **Primary Technologies:** SwiftUI, SwiftData, WidgetKit, HealthKit
 
