@@ -126,9 +126,24 @@ struct HomeView: View {
         return newGoals
     }
     
+    // Calculate trainings in current week (Monday to Sunday) for goal progress
+    private var trainingsThisWeek: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToSubtract = (weekday + 5) % 7 // Convert to Monday-based week (1 = Sunday, 2 = Monday, etc.)
+        let startOfWeek = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!)
+        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: startOfWeek)! // End of Sunday (start of next Monday)
+        
+        return trainings.filter { training in
+            let trainingDate = calendar.startOfDay(for: training.date)
+            return trainingDate >= startOfWeek && trainingDate < endOfWeek
+        }.count
+    }
+    
     private var trainingProgress: Double {
         guard userGoals.targetTrainingsPerWeek > 0 else { return 0 }
-        return Double(trainingsInSelectedRange.count) / Double(userGoals.targetTrainingsPerWeek)
+        return Double(trainingsThisWeek) / Double(userGoals.targetTrainingsPerWeek)
     }
     
     private var runsThisWeek: Int {
@@ -304,6 +319,9 @@ struct HomeView: View {
         .onChange(of: trainings) { oldValue, newValue in
             updateWidgetData()
         }
+        .onChange(of: runningSessions) { oldValue, newValue in
+            updateWidgetData()
+        }
         .onChange(of: weightEntries) { oldValue, newValue in
             updateWidgetData()
         }
@@ -328,9 +346,8 @@ struct HomeView: View {
         
         let fileURL = containerURL.appendingPathComponent("widgetData.json")
         
-        // Calculate trainings in last 7 days
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        let recentTrainings = trainings.filter { $0.date >= sevenDaysAgo }.count
+        // Calculate trainings in current week (Monday to Sunday) - same as Dashboard
+        let recentTrainings = trainingsThisWeek
         
         // Process exercise goals
         var exerciseGoalsData: [[String: Any]] = []
@@ -386,9 +403,31 @@ struct HomeView: View {
             ])
         }
         
+        // Calculate running stats for this week
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToSubtract = (weekday + 5) % 7
+        let startOfWeek = calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!
+        let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek)!
+        
+        let runsThisWeek = runningSessions.filter { run in
+            run.startTime >= startOfWeek && run.startTime <= endOfWeek
+        }.count
+        
+        let distanceThisWeek = runningSessions
+            .filter { run in
+                run.startTime >= startOfWeek && run.startTime <= endOfWeek
+            }
+            .reduce(0.0) { $0 + $1.distanceInKm }
+        
         let data = [
             "trainingsLast7Days": recentTrainings,
             "targetTrainingsPerWeek": userGoals.targetTrainingsPerWeek,
+            "runsThisWeek": runsThisWeek,
+            "targetRunsPerWeek": userGoals.targetRunsPerWeek ?? 3,
+            "distanceThisWeek": distanceThisWeek,
+            "targetDistancePerWeek": userGoals.targetDistancePerWeek ?? 20.0,
             "currentWeight": currentWeight ?? 0.0,
             "targetWeight": userGoals.targetWeight,
             "startingWeight": userGoals.startingWeight ?? 0.0,

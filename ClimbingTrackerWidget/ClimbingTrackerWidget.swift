@@ -10,17 +10,17 @@ import SwiftUI
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+        SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, runsThisWeek: 0, targetRunsPerWeek: 0, distanceThisWeek: 0, targetDistancePerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> ()) {
-        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, runsThisWeek: 0, targetRunsPerWeek: 0, distanceThisWeek: 0, targetDistancePerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> ()) {
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.tornado-studios.climbingtracker99") else {
-            let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+            let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, runsThisWeek: 0, targetRunsPerWeek: 0, distanceThisWeek: 0, targetDistancePerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
             let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(300))) // Update every 5 minutes
             completion(timeline)
             return
@@ -33,30 +33,25 @@ struct Provider: TimelineProvider {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 let trainingsLast7Days = json["trainingsLast7Days"] as? Int ?? 0
                 let targetTrainingsPerWeek = json["targetTrainingsPerWeek"] as? Int ?? 0
+                let runsThisWeek = json["runsThisWeek"] as? Int ?? 0
+                let targetRunsPerWeek = json["targetRunsPerWeek"] as? Int ?? 0
+                let distanceThisWeek = json["distanceThisWeek"] as? Double ?? 0
+                let targetDistancePerWeek = json["targetDistancePerWeek"] as? Double ?? 0
                 let currentWeight = json["currentWeight"] as? Double ?? 0
                 let targetWeight = json["targetWeight"] as? Double ?? 0
                 let startingWeight = json["startingWeight"] as? Double ?? 0
-                
-                // Parse exercise goals
-                var exerciseGoals: [ExerciseGoalData] = []
-                if let goalsData = json["exerciseGoals"] as? [[String: Any]] {
-                    for goalData in goalsData {
-                        if let type = goalData["type"] as? String,
-                           let progress = goalData["progress"] as? Double,
-                           let details = goalData["details"] as? String {
-                            exerciseGoals.append(ExerciseGoalData(type: type, progress: progress, details: details))
-                        }
-                    }
-                }
                 
                 let entry = SimpleEntry(
                     date: Date(),
                     trainingsLast7Days: trainingsLast7Days,
                     targetTrainingsPerWeek: targetTrainingsPerWeek,
+                    runsThisWeek: runsThisWeek,
+                    targetRunsPerWeek: targetRunsPerWeek,
+                    distanceThisWeek: distanceThisWeek,
+                    targetDistancePerWeek: targetDistancePerWeek,
                     currentWeight: currentWeight,
                     targetWeight: targetWeight,
-                    startingWeight: startingWeight,
-                    exerciseGoals: exerciseGoals
+                    startingWeight: startingWeight
                 )
                 
                 // Update every 5 minutes
@@ -69,7 +64,7 @@ struct Provider: TimelineProvider {
             print("Error reading widget data: \(error)")
         }
         
-        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0, exerciseGoals: [])
+        let entry = SimpleEntry(date: Date(), trainingsLast7Days: 0, targetTrainingsPerWeek: 0, runsThisWeek: 0, targetRunsPerWeek: 0, distanceThisWeek: 0, targetDistancePerWeek: 0, currentWeight: 0, targetWeight: 0, startingWeight: 0)
         let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(300))) // Update every 5 minutes
         completion(timeline)
     }
@@ -79,203 +74,116 @@ struct SimpleEntry: TimelineEntry {
     let date: Date
     let trainingsLast7Days: Int
     let targetTrainingsPerWeek: Int
+    let runsThisWeek: Int
+    let targetRunsPerWeek: Int
+    let distanceThisWeek: Double
+    let targetDistancePerWeek: Double
     let currentWeight: Double
     let targetWeight: Double
     let startingWeight: Double
-    let exerciseGoals: [ExerciseGoalData]
     
     var trainingProgress: Double {
         guard targetTrainingsPerWeek > 0 else { return 0 }
         return Double(trainingsLast7Days) / Double(targetTrainingsPerWeek)
     }
     
-    var weightProgress: (progress: Double, isOverStarting: Bool)? {
-        guard currentWeight > 0, targetWeight > 0, startingWeight > 0 else { return nil }
+    var runningProgress: Double {
+        guard targetRunsPerWeek > 0 else { return 0 }
+        return Double(runsThisWeek) / Double(targetRunsPerWeek)
+    }
+    
+    var distanceProgress: Double {
+        guard targetDistancePerWeek > 0 else { return 0 }
+        return distanceThisWeek / targetDistancePerWeek
+    }
+    
+    var weightProgress: Double {
+        guard currentWeight > 0, targetWeight > 0, startingWeight > 0 else { return 0 }
         
         if startingWeight > targetWeight {
             // Losing weight
             if currentWeight > startingWeight {
                 // Over starting weight
-                return (0.0, true)
+                return 0.0
             } else if currentWeight < targetWeight {
                 // Below target weight
-                return (1.0, false)
+                return 1.0
             } else {
                 // Between starting and target
                 let totalRange = startingWeight - targetWeight
                 let currentRange = startingWeight - currentWeight
-                return (currentRange / totalRange, false)
+                return currentRange / totalRange
             }
         } else {
             // Gaining weight
             if currentWeight < startingWeight {
                 // Below starting weight
-                return (0.0, true)
+                return 0.0
             } else if currentWeight > targetWeight {
                 // Above target weight
-                return (1.0, false)
+                return 1.0
             } else {
                 // Between starting and target
                 let totalRange = targetWeight - startingWeight
                 let currentRange = currentWeight - startingWeight
-                return (currentRange / totalRange, false)
+                return currentRange / totalRange
             }
         }
     }
-}
-
-struct ExerciseGoalData: Codable {
-    let type: String
-    let progress: Double
-    let details: String
 }
 
 struct ClimbingTrackerWidgetEntryView : View {
     var entry: SimpleEntry
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header
-            HStack(alignment: .center, spacing: 4) {
-                Image("climbing.icon")
-                    .resizable()
-                    .renderingMode(.template)
-                    .aspectRatio(contentMode: .fit)
-                    .foregroundColor(.black)
-                    .frame(height: 20)
-                Text("Climbing Tracker")
-                    .font(.system(size: 16, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                Spacer()
-            }
-            .padding(.bottom, 6)
-            
-            // Training Progress Section
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 2) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 11))
-                        .foregroundColor(.blue)
-                    Text("Training")
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                    Spacer()
-                    Text("\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.blue)
-                        .lineLimit(1)
+        VStack(spacing: 10) {
+            // 4 Circles Grid (2x2)
+            VStack(spacing: 10) {
+                // Top row
+                HStack(spacing: 10) {
+                    // Training Circle
+                    GoalCircleView(
+                        progress: entry.trainingProgress,
+                        icon: "chart.line.uptrend.xyaxis",
+                        title: "Training",
+                        subtitle: "\(entry.trainingsLast7Days)/\(entry.targetTrainingsPerWeek)",
+                        color: .blue
+                    )
+                    
+                    // Runs Circle
+                    GoalCircleView(
+                        progress: entry.runningProgress,
+                        icon: "figure.run",
+                        title: "Runs",
+                        subtitle: "\(entry.runsThisWeek)/\(entry.targetRunsPerWeek)",
+                        color: .green
+                    )
                 }
                 
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        // Background track
-                        RoundedRectangle(cornerRadius: 2)
-                            .frame(width: geometry.size.width, height: 6)
-                            .foregroundColor(Color(.systemGray5))
-                        
-                        // Progress bar
-                        RoundedRectangle(cornerRadius: 2)
-                            .frame(width: min(CGFloat(entry.trainingProgress) * geometry.size.width, geometry.size.width), height: 6)
-                            .foregroundColor(entry.trainingProgress >= 1.0 ? .green : .blue)
-                            .shadow(color: .blue.opacity(0.3), radius: 1, x: 0, y: 1)
-                    }
-                }
-                .frame(height: 6)
-            }
-            
-            // Weight Progress Section
-            if entry.currentWeight > 0 {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "scalemass")
-                            .font(.system(size: 11))
-                            .foregroundColor(.orange)
-                        Text("Weight")
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(String(format: "%.1f", entry.currentWeight)) kg")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.orange)
-                            .lineLimit(1)
-                    }
+                // Bottom row
+                HStack(spacing: 10) {
+                    // Distance Circle
+                    GoalCircleView(
+                        progress: entry.distanceProgress,
+                        icon: "map",
+                        title: "Distance",
+                        subtitle: String(format: "%.1f/%.0f km", entry.distanceThisWeek, entry.targetDistancePerWeek),
+                        color: .purple
+                    )
                     
-                    if let weightProgress = entry.weightProgress {
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background track
-                                RoundedRectangle(cornerRadius: 2)
-                                    .frame(width: geometry.size.width, height: 6)
-                                    .foregroundColor(Color(.systemGray5))
-                                
-                                if weightProgress.isOverStarting {
-                                    // Show red bar for the overage
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .frame(width: geometry.size.width, height: 6)
-                                        .foregroundColor(.red)
-                                        .shadow(color: .red.opacity(0.3), radius: 1, x: 0, y: 1)
-                                } else {
-                                    // Show progress bar
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .frame(width: min(CGFloat(weightProgress.progress) * geometry.size.width, geometry.size.width), height: 6)
-                                        .foregroundColor(.orange)
-                                        .shadow(color: .orange.opacity(0.3), radius: 1, x: 0, y: 1)
-                                }
-                            }
-                        }
-                        .frame(height: 6)
-                    }
-                }
-            }
-            
-            // Exercise Goals Section
-            if !entry.exerciseGoals.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 2) {
-                        Image(systemName: "figure.climbing")
-                            .font(.system(size: 11))
-                            .foregroundColor(.purple)
-                        Text("Exercise Goals")
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                        Spacer()
-                    }
-                    
-                    ForEach(entry.exerciseGoals.prefix(2), id: \.type) { goal in
-                        HStack(spacing: 2) {
-                            Text(goal.type)
-                                .font(.system(size: 10))
-                                .lineLimit(1)
-                            Spacer()
-                            Text("\(Int(goal.progress * 100))%")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.purple)
-                        }
-                        
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background track
-                                RoundedRectangle(cornerRadius: 2)
-                                    .frame(width: geometry.size.width, height: 4)
-                                    .foregroundColor(Color(.systemGray5))
-                                
-                                // Progress bar
-                                RoundedRectangle(cornerRadius: 2)
-                                    .frame(width: min(CGFloat(goal.progress) * geometry.size.width, geometry.size.width), height: 4)
-                                    .foregroundColor(.purple)
-                                    .shadow(color: .purple.opacity(0.3), radius: 1, x: 0, y: 1)
-                            }
-                        }
-                        .frame(height: 4)
-                    }
+                    // Weight Circle
+                    GoalCircleView(
+                        progress: entry.weightProgress,
+                        icon: "scalemass",
+                        title: "Weight",
+                        subtitle: entry.currentWeight > 0 ? String(format: "%.1f kg", entry.currentWeight) : "—",
+                        color: .orange
+                    )
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.top, 16)
-        .padding(.bottom, 10)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(.systemBackground))
@@ -283,6 +191,54 @@ struct ClimbingTrackerWidgetEntryView : View {
         .containerBackground(for: .widget) {
             Color(.systemBackground)
         }
+    }
+}
+
+// MARK: - Goal Circle View Component
+
+struct GoalCircleView: View {
+    let progress: Double
+    let icon: String
+    let title: String
+    let subtitle: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                // Background circle
+                Circle()
+                    .stroke(color.opacity(0.15), lineWidth: 3)
+                    .frame(width: 45, height: 45)
+                
+                // Progress circle
+                Circle()
+                    .trim(from: 0, to: max(0, min(1, progress)))
+                    .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 45, height: 45)
+                    .rotationEffect(.degrees(-90))
+                
+                // Icon in center
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            
+            // Title
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            
+            // Subtitle
+            Text(subtitle)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -303,5 +259,5 @@ struct ClimbingTrackerWidget: Widget {
 #Preview(as: .systemSmall) {
     ClimbingTrackerWidget()
 } timeline: {
-    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, currentWeight: 75.5, targetWeight: 72.0, startingWeight: 70.0, exerciseGoals: [])
+    SimpleEntry(date: .now, trainingsLast7Days: 3, targetTrainingsPerWeek: 4, runsThisWeek: 2, targetRunsPerWeek: 3, distanceThisWeek: 15.5, targetDistancePerWeek: 20.0, currentWeight: 75.5, targetWeight: 72.0, startingWeight: 70.0)
 }

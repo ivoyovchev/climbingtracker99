@@ -304,6 +304,13 @@ struct RecordTrainingView: View {
             modelContext.insert(exercise)
         }
         
+        // Explicitly save to ensure training is persisted immediately
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error saving training: \(error.localizedDescription)")
+        }
+        
         dismiss()
     }
     

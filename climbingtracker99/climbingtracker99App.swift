@@ -68,11 +68,20 @@ struct climbingtracker99App: App {
         // Get the model context
         let context = ModelContext(modelContainer)
         
-        // Fetch trainings from the last 7 days
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        // Calculate current week boundaries (Monday to Sunday)
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let daysToSubtract = (weekday + 5) % 7 // Convert to Monday-based week (1 = Sunday, 2 = Monday, etc.)
+        let startOfWeek = calendar.startOfDay(for: calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!)
+        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: startOfWeek)! // End of Sunday (start of next Monday)
+        
+        // Fetch trainings from current week (Monday to Sunday)
+        // Note: We compare dates directly - training.date includes time components,
+        // but startOfWeek is normalized to start of day and endOfWeek is start of next Monday
         let descriptor = FetchDescriptor<Training>(
             predicate: #Predicate<Training> { training in
-                training.date >= sevenDaysAgo
+                training.date >= startOfWeek && training.date < endOfWeek
             }
         )
         
@@ -86,6 +95,23 @@ struct climbingtracker99App: App {
             // Fetch current weight
             let weightDescriptor = FetchDescriptor<WeightEntry>(sortBy: [SortDescriptor(\.date, order: .reverse)])
             let currentWeight = try context.fetch(weightDescriptor).first?.weight ?? 0.0
+            
+            // Fetch running sessions for this week
+            let calendar = Calendar.current
+            let now = Date()
+            let weekday = calendar.component(.weekday, from: now)
+            let daysToSubtract = (weekday + 5) % 7
+            let startOfWeek = calendar.date(byAdding: .day, value: -daysToSubtract, to: now)!
+            let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek)!
+            
+            let runningDescriptor = FetchDescriptor<RunningSession>(
+                predicate: #Predicate<RunningSession> { run in
+                    run.startTime >= startOfWeek && run.startTime <= endOfWeek
+                }
+            )
+            let runningSessions = try context.fetch(runningDescriptor)
+            let runsThisWeek = runningSessions.count
+            let distanceThisWeek = runningSessions.reduce(0.0) { $0 + $1.distanceInKm }
             
             // Process exercise goals
             var exerciseGoalsData: [[String: Any]] = []
@@ -144,6 +170,10 @@ struct climbingtracker99App: App {
             let data = [
                 "trainingsLast7Days": recentTrainings.count,
                 "targetTrainingsPerWeek": goals.targetTrainingsPerWeek,
+                "runsThisWeek": runsThisWeek,
+                "targetRunsPerWeek": goals.targetRunsPerWeek ?? 3,
+                "distanceThisWeek": distanceThisWeek,
+                "targetDistancePerWeek": goals.targetDistancePerWeek ?? 20.0,
                 "currentWeight": currentWeight,
                 "targetWeight": goals.targetWeight,
                 "startingWeight": goals.startingWeight ?? 0.0,
