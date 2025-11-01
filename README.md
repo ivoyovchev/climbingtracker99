@@ -2,6 +2,39 @@
 
 A comprehensive climbing training and progress tracking app for iOS.
 
+## Version 2.1.3
+
+### New Features (v2.1.3)
+- **Plan Tab** - Calendar-based training and run planning system:
+  - Interactive calendar view with visual indicators (dots) for scheduled days
+  - Schedule training sessions with multiple exercise selections
+  - Plan running sessions with distance, tempo, and type (long run, easy run, intervals, tempo run, recovery run, fartlek, hill run, track workout)
+  - Repeat weekly functionality - create recurring plans for multiple weeks
+  - Time of day selection for all planned activities (default: 5:30 PM)
+  - Auto-calculation of estimated duration for runs when tempo is set
+  - Individual editing of repeated plans - each instance can be modified independently
+- **Notification System** - Smart reminders for planned activities:
+  - Automatic notifications 1-2 hours before scheduled trainings/runs (configurable)
+  - Settings to control notification preferences and reminder timing
+  - Test notification feature to preview notification appearance
+  - Notifications automatically update when plans are edited
+  - Banner notifications display even when app is in foreground
+- **Enhanced Activity Tab** - Improved training detail display:
+  - Fixed duration display for Warmup exercises (shows minutes instead of seconds)
+  - Detailed breakdown for all recorded exercises when viewing training details
+  - Exercise-specific information display (board climbing routes, campus sets, etc.)
+  - Graceful handling of logged trainings without detailed data
+
+### Version 2.1.2
+- Fixed training goal calculation on Dashboard to correctly count weekly trainings
+- Improved widget data synchronization
+- Enhanced training statistics accuracy
+
+### Version 2.1.1
+- Widget redesign: Four circular progress indicators (Training, Runs, Distance, Weight)
+- Removed widget header for more space
+- Optimized widget layout for better content fit
+
 ## Version 2.1.0
 
 ### Major Features
@@ -69,6 +102,18 @@ The Record Training feature allows you to track workouts live with detailed exer
 - **Sound Cues** - Audio feedback for timed exercises
 - **Detailed Set Tracking** - Save and review all sets with complete statistics
 - **Progress Tracking** - Summary statistics including totals, averages, and progress metrics
+
+### Version 2.1.3 Updates
+- Added Plan tab with calendar view for scheduling trainings and runs
+- Implemented notification system with configurable reminders (1-2 hours before)
+- Added ability to select multiple exercises per training plan
+- Added repeat weekly functionality for plans (2-52 weeks)
+- Added time of day selection for all plans (defaults to 5:30 PM)
+- Added visual indicators on calendar for scheduled days
+- Auto-calculation of run duration when tempo is set
+- Fixed test notification banner display for immediate preview
+- Enhanced Activity tab with detailed exercise breakdowns
+- Fixed training goal counting to use Monday-Sunday week consistently
 
 ### Version 2.1.0 Updates
 - Added Circuit, Core, and Campusing exercises with dedicated workout interfaces
