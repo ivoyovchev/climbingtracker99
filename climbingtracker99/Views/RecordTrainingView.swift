@@ -496,6 +496,16 @@ struct ExerciseRecordingCard: View {
                         recordedExercise.notes = newValue.notes
                     }
                 ), onComplete: onComplete)
+            } else if exercise.type == .benchmark {
+                // Benchmark workout button
+                BenchmarkWorkoutButton(recordedExercise: Binding(
+                    get: { recordedExercise },
+                    set: { newValue in
+                        // Update properties from newValue
+                        recordedExercise.benchmarkResultsData = newValue.benchmarkResultsData
+                        recordedExercise.notes = newValue.notes
+                    }
+                ), onComplete: onComplete)
             } else {
                 // Standard timer display for other exercises
                 VStack(spacing: 8) {

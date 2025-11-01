@@ -88,6 +88,7 @@ private struct ExerciseParameterTrendsView: View {
         case .circuit: return ["duration", "sets", "restDuration"]
         case .core: return ["duration", "sets", "restDuration"]
         case .campusing: return ["sets", "restDuration", "edgeSize"]
+        case .benchmark: return [] // Benchmarks have their own display system
         }
     }
     

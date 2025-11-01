@@ -77,6 +77,7 @@ struct HomeView: View {
     @Query(sort: \Training.date, order: .reverse) private var trainings: [Training]
     @Query(sort: \RunningSession.startTime, order: .reverse) private var runningSessions: [RunningSession]
     @Query(sort: \WeightEntry.date, order: .reverse) private var weightEntries: [WeightEntry]
+    @Query(sort: \PlannedBenchmark.date) private var plannedBenchmarks: [PlannedBenchmark]
     @Query private var goals: [Goals]
     
     @State private var showingGoalsSheet = false
@@ -287,6 +288,10 @@ struct HomeView: View {
             GoalsSectionView(goals: userGoals, trainingProgress: trainingProgress, runsThisWeek: runsThisWeek, distanceThisWeek: distanceThisWeek, currentWeight: currentWeight, showingGoalsSheet: $showingGoalsSheet)
                 .frame(maxWidth: .infinity, alignment: .center)
             TrainingTrendsView(trainings: trainings, weeklyTarget: userGoals.targetTrainingsPerWeek)
+            
+            UpcomingBenchmarksView(benchmarks: plannedBenchmarks)
+            
+            BenchmarkProgressView()
         }
         .padding(.vertical)
     }

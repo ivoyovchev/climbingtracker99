@@ -744,6 +744,16 @@ struct ExerciseDetails: View {
                 CoreDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .campusing:
                 CampusingDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .benchmark:
+                // Benchmarks use their own display in TrainingDetailView
+                if let recorded = recordedExercise, !recorded.benchmarkResultsData.isEmpty {
+                    Text("Benchmark Results")
+                        .font(.headline)
+                } else {
+                    Text("No benchmark results")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }

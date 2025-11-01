@@ -30,6 +30,7 @@ enum ExerciseType: String, CaseIterable, Codable {
     case circuit = "Circuit"
     case core = "Core"
     case campusing = "Campusing"
+    case benchmark = "Benchmark"
     
     // Custom decoder to handle migration from old "Hangboarding (Max Hang)" to new name
     init(from decoder: Decoder) throws {
@@ -75,6 +76,8 @@ enum ExerciseType: String, CaseIterable, Codable {
             self = .core
         case "Campusing":
             self = .campusing
+        case "Benchmark":
+            self = .benchmark
         default:
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot initialize ExerciseType from invalid String value \(rawValue)")
         }
@@ -124,6 +127,8 @@ enum ExerciseType: String, CaseIterable, Codable {
             return "flexibility" // Use flexibility icon for core
         case .campusing:
             return "boulder_campus"
+        case .benchmark:
+            return "chart.line.uptrend.xyaxis"
         }
     }
     
@@ -162,6 +167,8 @@ enum ExerciseType: String, CaseIterable, Codable {
             return ["Abs", "Full Core", "Lower Back", "Obliques"]
         case .campusing:
             return ["Power", "Strength", "Coordination", "Dynamic"]
+        case .benchmark:
+            return [] // Benchmarks use their own selection system
         }
     }
     
@@ -289,6 +296,9 @@ final class Exercise {
             self.restDuration = 60
             self.edgeSize = 20
             self.focus = .power
+        case .benchmark:
+            // Benchmarks don't need default values as they're recorded differently
+            self.focus = .strength
         }
     }
 } 

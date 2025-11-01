@@ -30,7 +30,8 @@ struct climbingtracker99App: App {
                 MoonLogEntry.self,
                 RunningSession.self,
                 PlannedTraining.self,
-                PlannedRun.self
+                PlannedRun.self,
+                PlannedBenchmark.self
             ])
             
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -266,7 +267,8 @@ struct AppContentView: View {
             Exercise(type: .running, focus: .endurance),
             Exercise(type: .circuit, focus: .endurance),
             Exercise(type: .core, focus: .mobility),
-            Exercise(type: .campusing, focus: .power)
+            Exercise(type: .campusing, focus: .power),
+            Exercise(type: .benchmark, focus: .strength)
         ]
         
         for exercise in defaultExercises {

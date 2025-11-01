@@ -126,6 +126,11 @@ struct ExerciseDetailRow: View {
                 CoreRow(exercise: exercise)
             case .campusing:
                 CampusingRow(exercise: exercise)
+            case .benchmark:
+                // Simple display for benchmarks
+                Text("Benchmark")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)

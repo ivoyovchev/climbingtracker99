@@ -738,7 +738,65 @@ struct RecordedExerciseDetailsView: View {
                 if exercise.legs {
                     DetailRow(label: "Legs", value: "Yes")
                 }
+                
+            case .benchmark:
+                // Show benchmark results if available
+                if !exercise.benchmarkResultsData.isEmpty {
+                    if let results = parseBenchmarkResults() {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Benchmark Results")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            ForEach(Array(results.enumerated()), id: \.offset) { index, result in
+                                if let type = BenchmarkType(rawValue: result.benchmarkType) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(type.displayName)
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                        HStack {
+                                            Text(String(format: "%.1f", result.value1))
+                                                .font(.caption)
+                                            Text(type.unit)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            if let value2 = result.value2 {
+                                                Spacer()
+                                                Text("R: \(String(format: "%.1f", value2))")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                } else {
+                    Text("No benchmark results recorded")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
+        }
+    }
+    
+    private func parseBenchmarkResults() -> [(benchmarkType: String, value1: Double, value2: Double?, date: String)]? {
+        guard !exercise.benchmarkResultsData.isEmpty,
+              let data = exercise.benchmarkResultsData.data(using: .utf8),
+              let results = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            return nil
+        }
+        
+        return results.compactMap { result in
+            guard let type = result["benchmarkType"] as? String,
+                  let value1 = result["value1"] as? Double else {
+                return nil as (benchmarkType: String, value1: Double, value2: Double?, date: String)?
+            }
+            let value2 = result["value2"] as? Double
+            let date = result["date"] as? String ?? ""
+            return (benchmarkType: type, value1: value1, value2: value2, date: date)
         }
     }
     

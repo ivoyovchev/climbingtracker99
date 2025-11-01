@@ -98,6 +98,8 @@ struct ExercisesView: View {
                 exercise.focus = .mobility
             case .campusing:
                 exercise.focus = .power
+            case .benchmark:
+                exercise.focus = .strength
             }
         }
     }
@@ -245,6 +247,10 @@ struct ExerciseDetailsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+            case .benchmark:
+                Text("Benchmark Testing")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
             }
         }
     }

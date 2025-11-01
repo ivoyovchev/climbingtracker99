@@ -456,6 +456,9 @@ struct ExerciseFormView: View {
             case .circuit, .core, .campusing:
                 // These exercises use dedicated workout views, no form needed
                 EmptyView()
+            case .benchmark:
+                // Benchmarks are handled in the BenchmarkView, no form fields needed here
+                EmptyView()
             }
         }
     }

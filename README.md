@@ -2,7 +2,21 @@
 
 A comprehensive climbing training and progress tracking app for iOS.
 
-## Version 2.1.3
+## Version 2.2.0
+
+### New Features (v2.2.0)
+- **Benchmarks Feature** - Comprehensive benchmark testing and progress tracking:
+  - **14 Benchmark Types**: Max Pullups, Max Pull-up with 3 reps, Max Campus Moves 30mm, Max Lockoff (1 hand left/right, 2 hands), Max Grip Hang 30mm, Max Hang Time (10mm/15mm/20mm/30mm), Max Repeaters (10mm/15mm/20mm), Max Edge Pull 20mm
+  - **Plan Benchmarks** - Schedule benchmark tests in the Plan tab with calendar integration
+  - **Multi-Select Benchmarks** - Select multiple benchmark types to test in a single session
+  - **Record Benchmarks** - Record benchmark results via "Benchmark" exercise type in Record Training
+  - **3-Day Reminders** - Automatic notifications 3 days before scheduled benchmark tests
+  - **Progress Graphs** - Visual progression charts on Dashboard showing benchmark results over time (appears when 2+ results exist)
+  - **Upcoming Benchmarks** - Dashboard section showing upcoming benchmark tests within 30 days
+  - **Date Labels** - Each recording shows exact date on progress graphs
+  - **Auto-linking** - Benchmark results from Record Training automatically link to planned benchmarks
+
+### Version 2.1.3
 
 ### New Features (v2.1.3)
 - **Plan Tab** - Calendar-based training and run planning system:
@@ -102,6 +116,16 @@ The Record Training feature allows you to track workouts live with detailed exer
 - **Sound Cues** - Audio feedback for timed exercises
 - **Detailed Set Tracking** - Save and review all sets with complete statistics
 - **Progress Tracking** - Summary statistics including totals, averages, and progress metrics
+
+### Version 2.2.0 Updates
+- Added comprehensive Benchmarks feature with 14 benchmark types
+- Added Benchmark as exercise type for Record Training
+- Added benchmark progress graphs on Dashboard
+- Added upcoming benchmarks section on Dashboard
+- Added benchmark planning with multi-select in Plan tab
+- Updated calendar to start with Monday instead of Sunday
+- Fixed benchmark graph date display (shows exact recording dates)
+- Fixed SF Symbol error for benchmark icons
 
 ### Version 2.1.3 Updates
 - Added Plan tab with calendar view for scheduling trainings and runs

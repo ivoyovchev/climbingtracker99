@@ -83,6 +83,9 @@ final class RecordedExercise: ObservableObject {
     // Deadlifts set tracking (stored as JSON string)
     var deadliftsSetsData: String = "" // JSON array of {reps: Int, weight: Int, restDuration: Int}
     
+    // Benchmark results tracking (stored as JSON string)
+    var benchmarkResultsData: String = "" // JSON array of {benchmarkType: String, value1: Double, value2: Double?, date: String}
+    
     // ObservableObject conformance - marked as non-persisted
     @Transient
     var objectWillChange = PassthroughSubject<Void, Never>()

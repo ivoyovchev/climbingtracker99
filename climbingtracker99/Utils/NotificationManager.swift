@@ -87,6 +87,26 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
     }
     
+    // Schedule notification for a planned benchmark (3 days before)
+    func scheduleBenchmarkNotification(for benchmark: PlannedBenchmark) {
+        guard notificationsEnabled else { return }
+        // Benchmarks get reminders 3 days before
+        scheduleNotification(
+            for: benchmark.date,
+            estimatedTime: benchmark.estimatedTimeOfDay,
+            identifier: "benchmark-\(benchmark.persistentModelID.hashValue)",
+            title: "Benchmark Reminder",
+            body: buildBenchmarkBody(benchmark, daysBefore: 3),
+            hoursBefore: 72.0 // 3 days = 72 hours
+        )
+    }
+    
+    // Remove notification for a planned benchmark
+    func removeBenchmarkNotification(for benchmark: PlannedBenchmark) {
+        let identifier = "benchmark-\(benchmark.persistentModelID.hashValue)"
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
+    }
+    
     // Private helper to schedule notification
     private func scheduleNotification(
         for date: Date,
@@ -168,6 +188,17 @@ class NotificationManager: ObservableObject {
     private func buildRunBody(_ run: PlannedRun, hoursBefore: Double) -> String {
         let hoursText = formatHoursBefore(hoursBefore)
         return "You have a \(run.runningType.rawValue) (\(String(format: "%.1f", run.estimatedDistance)) km) scheduled in \(hoursText) (\(formatTime(run.estimatedTimeOfDay)))"
+    }
+    
+    private func buildBenchmarkBody(_ benchmark: PlannedBenchmark, daysBefore: Int) -> String {
+        return "You have a \(benchmark.benchmarkType.displayName) benchmark scheduled in \(daysBefore) days (\(formatDate(benchmark.date)))"
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
     
     private func formatHoursBefore(_ hours: Double) -> String {
@@ -301,7 +332,7 @@ class NotificationManager: ObservableObject {
     }
     
     // Reschedule all notifications (useful after migration or when re-enabling notifications)
-    func rescheduleAllNotifications(trainings: [PlannedTraining], runs: [PlannedRun]) {
+    func rescheduleAllNotifications(trainings: [PlannedTraining], runs: [PlannedRun], benchmarks: [PlannedBenchmark] = []) {
         guard notificationsEnabled else {
             // Remove all if disabled
             UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
@@ -318,6 +349,10 @@ class NotificationManager: ObservableObject {
         
         for run in runs {
             scheduleRunNotification(for: run)
+        }
+        
+        for benchmark in benchmarks {
+            scheduleBenchmarkNotification(for: benchmark)
         }
     }
     

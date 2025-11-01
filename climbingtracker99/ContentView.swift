@@ -442,11 +442,14 @@ struct SettingsView: View {
                                         // Reschedule all notifications
                                         let trainingDescriptor = FetchDescriptor<PlannedTraining>()
                                         let runDescriptor = FetchDescriptor<PlannedRun>()
+                                        let benchmarkDescriptor = FetchDescriptor<PlannedBenchmark>()
                                         if let trainings = try? modelContext.fetch(trainingDescriptor),
-                                           let runs = try? modelContext.fetch(runDescriptor) {
+                                           let runs = try? modelContext.fetch(runDescriptor),
+                                           let benchmarks = try? modelContext.fetch(benchmarkDescriptor) {
                                             NotificationManager.shared.rescheduleAllNotifications(
                                                 trainings: trainings,
-                                                runs: runs
+                                                runs: runs,
+                                                benchmarks: benchmarks
                                             )
                                         }
                                     } else {
@@ -537,7 +540,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("2.1.3")
+                        Text("2.2.0")
                             .foregroundColor(.gray)
                     }
                 }

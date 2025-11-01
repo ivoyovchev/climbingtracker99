@@ -93,6 +93,9 @@ struct ExerciseStatsCard: View {
             case .circuit, .core, .campusing:
                 // Basic stats for new exercise types
                 BasicExerciseStats(trainings: trainings, exerciseType: exerciseType, focus: focus)
+            case .benchmark:
+                // Benchmarks have their own progress tracking system
+                BasicExerciseStats(trainings: trainings, exerciseType: exerciseType, focus: focus)
             }
         }
         .padding()

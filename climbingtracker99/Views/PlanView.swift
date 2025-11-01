@@ -6,6 +6,7 @@ struct PlanView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PlannedTraining.date) private var plannedTrainings: [PlannedTraining]
     @Query(sort: \PlannedRun.date) private var plannedRuns: [PlannedRun]
+    @Query(sort: \PlannedBenchmark.date) private var plannedBenchmarks: [PlannedBenchmark]
     @Query private var exercises: [Exercise]
     
     @State private var selectedDate: Date = Date()
@@ -15,6 +16,7 @@ struct PlanView: View {
     enum PlanType {
         case training
         case run
+        case benchmark
     }
     
     var body: some View {
@@ -24,7 +26,8 @@ struct PlanView: View {
                 CalendarView(
                     selectedDate: $selectedDate,
                     plannedTrainings: plannedTrainings,
-                    plannedRuns: plannedRuns
+                    plannedRuns: plannedRuns,
+                    plannedBenchmarks: plannedBenchmarks
                 )
                     .padding()
                     .background(Color(.systemBackground))
@@ -76,6 +79,13 @@ struct PlanView: View {
                         }) {
                             Label("Add Run", systemImage: "figure.run")
                         }
+                        
+                        Button(action: {
+                            planType = .benchmark
+                            showingAddPlan = true
+                        }) {
+                            Label("Add Benchmark", systemImage: "chart.line.uptrend.xyaxis")
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 24))
@@ -85,8 +95,10 @@ struct PlanView: View {
             .sheet(isPresented: $showingAddPlan) {
                 if planType == .training {
                     AddPlannedTrainingView(date: selectedDate)
-                } else {
+                } else if planType == .run {
                     AddPlannedRunView(date: selectedDate)
+                } else {
+                    AddPlannedBenchmarkView(date: selectedDate)
                 }
             }
             .onAppear {
@@ -149,6 +161,10 @@ struct PlanView: View {
             for run in plannedRuns {
                 NotificationManager.shared.scheduleRunNotification(for: run)
             }
+            
+            for benchmark in plannedBenchmarks {
+                NotificationManager.shared.scheduleBenchmarkNotification(for: benchmark)
+            }
         }
     }
     
@@ -169,6 +185,11 @@ struct PlanView: View {
             plans.append(.run(run))
         }
         
+        // Add planned benchmarks
+        for benchmark in plannedBenchmarks where benchmark.date >= startOfDay && benchmark.date < endOfDay {
+            plans.append(.benchmark(benchmark))
+        }
+        
         // Sort by date
         return plans.sorted { plan1, plan2 in
             let date1 = plan1.date
@@ -181,6 +202,7 @@ struct PlanView: View {
 enum PlanItem: Identifiable {
     case training(PlannedTraining)
     case run(PlannedRun)
+    case benchmark(PlannedBenchmark)
     
     var id: String {
         switch self {
@@ -188,6 +210,8 @@ enum PlanItem: Identifiable {
             return "training-\(t.persistentModelID.hashValue)"
         case .run(let r):
             return "run-\(r.persistentModelID.hashValue)"
+        case .benchmark(let b):
+            return "benchmark-\(b.persistentModelID.hashValue)"
         }
     }
     
@@ -197,6 +221,8 @@ enum PlanItem: Identifiable {
             return t.date
         case .run(let r):
             return r.date
+        case .benchmark(let b):
+            return b.date
         }
     }
 }
@@ -212,6 +238,8 @@ struct PlanCard: View {
                 TrainingPlanCard(training: training)
             case .run(let run):
                 RunPlanCard(run: run)
+            case .benchmark(let benchmark):
+                BenchmarkPlanCard(benchmark: benchmark)
             }
         }
     }
@@ -381,12 +409,190 @@ struct RunPlanCard: View {
     }
 }
 
+struct BenchmarkPlanCard: View {
+    let benchmark: PlannedBenchmark
+    @Environment(\.modelContext) private var modelContext
+    @State private var showingEdit = false
+    @State private var showingRecordResults = false
+    @State private var showingDeleteAlert = false
+    
+    // Helper to format time
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: benchmark.benchmarkType.iconName)
+                .font(.title2)
+                .foregroundColor(.orange)
+                .frame(width: 40)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(benchmark.benchmarkType.displayName)
+                        .font(.headline)
+                    
+                    if benchmark.completed {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                    }
+                }
+                
+                HStack(spacing: 12) {
+                    Label(formatTime(benchmark.estimatedTimeOfDay), systemImage: "clock.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if benchmark.completed, let value1 = benchmark.resultValue1 {
+                        let unit = benchmark.benchmarkType.unit
+                        if benchmark.benchmarkType.requiresTwoHands, let value2 = benchmark.resultValue2 {
+                            Label("Left: \(String(format: "%.1f", value1)) \(unit), Right: \(String(format: "%.1f", value2)) \(unit)", systemImage: "checkmark")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Label("\(String(format: "%.1f", value1)) \(unit)", systemImage: "checkmark")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            Menu {
+                if !benchmark.completed {
+                    Button(action: {
+                        showingRecordResults = true
+                    }) {
+                        Label("Record Results", systemImage: "pencil")
+                    }
+                }
+                
+                Button(action: {
+                    showingEdit = true
+                }) {
+                    Label("Edit", systemImage: "pencil")
+                }
+                
+                Button(role: .destructive, action: {
+                    showingDeleteAlert = true
+                }) {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+        .sheet(isPresented: $showingEdit) {
+            EditPlannedBenchmarkView(benchmark: benchmark)
+        }
+        .sheet(isPresented: $showingRecordResults) {
+            RecordBenchmarkResultsView(benchmark: benchmark)
+        }
+        .alert("Delete Benchmark", isPresented: $showingDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                NotificationManager.shared.removeBenchmarkNotification(for: benchmark)
+                modelContext.delete(benchmark)
+            }
+        } message: {
+            Text("Are you sure you want to delete this benchmark?")
+        }
+    }
+}
+
+struct EditPlannedBenchmarkView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    let benchmark: PlannedBenchmark
+    @State private var selectedBenchmarkType: BenchmarkType
+    @State private var estimatedTime: Date
+    @State private var notes: String
+    
+    init(benchmark: PlannedBenchmark) {
+        self.benchmark = benchmark
+        _selectedBenchmarkType = State(initialValue: benchmark.benchmarkType)
+        _estimatedTime = State(initialValue: benchmark.estimatedTimeOfDay)
+        _notes = State(initialValue: benchmark.notes ?? "")
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Benchmark Details")) {
+                    Picker("Benchmark Type", selection: $selectedBenchmarkType) {
+                        ForEach(BenchmarkType.allCases, id: \.self) { type in
+                            HStack {
+                                Image(systemName: type.iconName)
+                                Text(type.displayName)
+                            }
+                            .tag(type)
+                        }
+                    }
+                    
+                    Text(selectedBenchmarkType.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+                    
+                    DatePicker("Estimated Time", selection: $estimatedTime, displayedComponents: .hourAndMinute)
+                }
+                
+                Section(header: Text("Notes")) {
+                    TextField("Optional notes", text: $notes, axis: .vertical)
+                        .lineLimit(3...6)
+                }
+                
+                Section {
+                    Button("Save Changes") {
+                        saveChanges()
+                    }
+                }
+            }
+            .navigationTitle("Edit Benchmark")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveChanges() {
+        benchmark.benchmarkType = selectedBenchmarkType
+        benchmark.estimatedTime = estimatedTime
+        benchmark.notes = notes.isEmpty ? nil : notes
+        
+        // Reschedule notification when editing
+        NotificationManager.shared.removeBenchmarkNotification(for: benchmark)
+        Task {
+            NotificationManager.shared.scheduleBenchmarkNotification(for: benchmark)
+        }
+        
+        dismiss()
+    }
+}
+
 // Calendar View Component
 struct CalendarView: View {
     @Binding var selectedDate: Date
     @State private var currentMonth: Date = Date()
     let plannedTrainings: [PlannedTraining]
     let plannedRuns: [PlannedRun]
+    let plannedBenchmarks: [PlannedBenchmark]
     
     private let calendar = Calendar.current
     
@@ -420,9 +626,9 @@ struct CalendarView: View {
                 }
             }
             
-            // Weekday headers
+            // Weekday headers (Monday first)
             HStack(spacing: 0) {
-                ForEach(["S", "M", "T", "W", "T", "F", "S"], id: \.self) { day in
+                ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { day in
                     Text(day)
                         .font(.caption)
                         .fontWeight(.semibold)
@@ -482,7 +688,11 @@ struct CalendarView: View {
             run.date >= startOfDay && run.date < endOfDay
         }
         
-        return hasTraining || hasRun
+        let hasBenchmark = plannedBenchmarks.contains { benchmark in
+            benchmark.date >= startOfDay && benchmark.date < endOfDay
+        }
+        
+        return hasTraining || hasRun || hasBenchmark
     }
 }
 
