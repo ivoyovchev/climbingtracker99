@@ -120,6 +120,12 @@ struct ExerciseDetailRow: View {
                 RunningRow(exercise: exercise)
             case .warmup:
                 WarmupRow(exercise: exercise)
+            case .circuit:
+                CircuitRow(exercise: exercise)
+            case .core:
+                CoreRow(exercise: exercise)
+            case .campusing:
+                CampusingRow(exercise: exercise)
             }
         }
         .padding(.vertical, 4)
@@ -408,6 +414,64 @@ struct WarmupRow: View {
                 Text("\(duration)s")
             } else if let duration = exercise.duration {
                 Text("\(duration) min")
+            }
+        }
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+    }
+}
+
+struct CircuitRow: View {
+    let exercise: RecordedExercise
+    
+    var body: some View {
+        HStack {
+            if let notes = exercise.notes, !notes.isEmpty {
+                Text(notes)
+            } else if let sets = exercise.sets {
+                Text("\(sets) sets")
+            } else if let duration = exercise.duration {
+                Text("\(duration)s")
+            }
+        }
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+    }
+}
+
+struct CoreRow: View {
+    let exercise: RecordedExercise
+    
+    var body: some View {
+        HStack {
+            if let notes = exercise.notes, !notes.isEmpty {
+                Text(notes)
+            } else if let sets = exercise.sets {
+                Text("\(sets) sets")
+                if let duration = exercise.duration {
+                    Text("• \(duration)s")
+                }
+            } else if let duration = exercise.duration {
+                Text("\(duration)s")
+            }
+        }
+        .font(.subheadline)
+        .foregroundColor(.secondary)
+    }
+}
+
+struct CampusingRow: View {
+    let exercise: RecordedExercise
+    
+    var body: some View {
+        HStack {
+            if let notes = exercise.notes, !notes.isEmpty {
+                Text(notes)
+            } else if let sets = exercise.sets {
+                Text("\(sets) sets")
+                if let edgeSize = exercise.edgeSize {
+                    Text("• \(edgeSize)mm")
+                }
             }
         }
         .font(.subheadline)

@@ -90,6 +90,9 @@ struct ExerciseStatsCard: View {
                 RunningStats(trainings: trainings, focus: focus)
             case .warmup:
                 WarmupStats(trainings: trainings, focus: focus)
+            case .circuit, .core, .campusing:
+                // Basic stats for new exercise types
+                BasicExerciseStats(trainings: trainings, exerciseType: exerciseType, focus: focus)
             }
         }
         .padding()
@@ -538,6 +541,51 @@ struct WarmupStats: View {
                     Text("\(Int(avgDuration))s")
                         .font(.subheadline)
                         .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+struct BasicExerciseStats: View {
+    let trainings: [Training]
+    let exerciseType: ExerciseType
+    let focus: TrainingFocus
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            let exercises = trainings.flatMap { $0.recordedExercises }
+                .filter { 
+                    $0.exercise.type == exerciseType && 
+                    $0.exercise.focus == focus 
+                }
+            
+            if !exercises.isEmpty {
+                Text("Total Sessions: \(exercises.count)")
+                    .font(.subheadline)
+                
+                let totalSets = exercises.compactMap({ $0.sets }).reduce(0, +)
+                if totalSets > 0 {
+                    HStack {
+                        Text("Total Sets")
+                            .font(.subheadline)
+                        Spacer()
+                        Text("\(totalSets)")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                let totalDuration = exercises.compactMap({ $0.duration }).reduce(0, +)
+                if totalDuration > 0 {
+                    HStack {
+                        Text("Total Duration")
+                            .font(.subheadline)
+                        Spacer()
+                        Text("\(totalDuration)s")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
         }

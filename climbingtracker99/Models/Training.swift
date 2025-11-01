@@ -43,6 +43,7 @@ final class RecordedExercise: ObservableObject {
     var hours: Int?
     var minutes: Int?
     var distance: Double?
+    var notes: String?
     
     // Live recording timing fields
     var recordedStartTime: Date?
@@ -189,6 +190,10 @@ final class RecordedExercise: ObservableObject {
     
     func updateDistance(_ value: Double?) {
         update(\.distance, value: value)
+    }
+    
+    func updateNotes(_ value: String?) {
+        update(\.notes, value: value)
     }
     
     // Computed property for selectedDetailOptions (converted from/to JSON)

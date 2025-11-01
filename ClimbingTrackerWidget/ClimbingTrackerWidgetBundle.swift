@@ -14,5 +14,6 @@ struct ClimbingTrackerWidgetBundle: WidgetBundle {
         ClimbingTrackerWidget()
         ClimbingTrackerWidgetControl()
         ClimbingTrackerWidgetLiveActivity()
+        RunningLiveActivity()
     }
 }

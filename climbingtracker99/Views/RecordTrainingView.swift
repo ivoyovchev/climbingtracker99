@@ -429,29 +429,66 @@ struct ExerciseRecordingCard: View {
                 }
             }
             
-            // Exercise-specific controls
+            // Exercise-specific controls - All now use full-screen workout buttons
             if exercise.type == .flexibility {
-                FlexibilityTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                FlexibilityWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .pullups {
-                PullupsTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                PullupsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .nxn {
-                NxNTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                NxNWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .boardClimbing {
-                BoardClimbingTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                BoardClimbingWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .shoulderLifts {
-                ShoulderLiftsTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                ShoulderLiftsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .repeaters {
-                RepeatersTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                RepeatersWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .edgePickups {
-                EdgePickupsTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                EdgePickupsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .limitBouldering {
-                LimitBoulderingTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                LimitBoulderingWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .hangboarding {
-                MaxHangsTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                MaxHangsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .boulderCampus {
-                BoulderCampusTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                BoulderCampusWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .deadlifts {
-                DeadliftsTimerView(recordedExercise: recordedExercise, onComplete: onComplete)
+                DeadliftsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
+            } else if exercise.type == .circuit {
+                // Circuit workout button
+                CircuitWorkoutButton(recordedExercise: Binding(
+                    get: { recordedExercise },
+                    set: { newValue in
+                        // Update properties from newValue
+                        recordedExercise.duration = newValue.duration
+                        recordedExercise.sets = newValue.sets
+                        recordedExercise.grade = newValue.grade
+                        recordedExercise.notes = newValue.notes
+                    }
+                ), onComplete: onComplete)
+            } else if exercise.type == .core {
+                // Core workout button
+                CoreWorkoutButton(recordedExercise: Binding(
+                    get: { recordedExercise },
+                    set: { newValue in
+                        // Update properties from newValue
+                        recordedExercise.duration = newValue.duration
+                        recordedExercise.sets = newValue.sets
+                        recordedExercise.restDuration = newValue.restDuration
+                        recordedExercise.notes = newValue.notes
+                    }
+                ), onComplete: onComplete)
+            } else if exercise.type == .campusing {
+                // Campusing workout button
+                CampusingWorkoutButton(recordedExercise: Binding(
+                    get: { recordedExercise },
+                    set: { newValue in
+                        // Update properties from newValue
+                        recordedExercise.duration = newValue.duration
+                        recordedExercise.sets = newValue.sets
+                        recordedExercise.edgeSize = newValue.edgeSize
+                        recordedExercise.restDuration = newValue.restDuration
+                        recordedExercise.notes = newValue.notes
+                    }
+                ), onComplete: onComplete)
             } else {
                 // Standard timer display for other exercises
                 VStack(spacing: 8) {
@@ -1534,8 +1571,9 @@ struct RepeatersTimerView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Configuration (only show if not started)
-            if !isRunning && currentSet == 0 && completedSets.isEmpty {
+            // Configuration (only show if not started - not running, not paused, no progress)
+            let hasStarted = isRunning || isPaused || currentSet > 0 || !completedSets.isEmpty || phase != .idle
+            if !hasStarted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure Workout")
                         .font(.headline)
@@ -2168,8 +2206,9 @@ struct EdgePickupsTimerView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Configuration (only show if not started)
-            if !isRunning && currentSet == 0 && completedSets.isEmpty {
+            // Configuration (only show if not started - not running, not paused, no progress)
+            let hasStarted = isRunning || isPaused || currentSet > 0 || !completedSets.isEmpty || phase != .idle
+            if !hasStarted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure Workout")
                         .font(.headline)
@@ -2819,8 +2858,9 @@ struct MaxHangsTimerView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Configuration (only show if not started)
-            if !isRunning && currentSet == 0 && completedSets.isEmpty {
+            // Configuration (only show if not started - not running, not paused, no progress)
+            let hasStarted = isRunning || isPaused || currentSet > 0 || !completedSets.isEmpty || phase != .idle
+            if !hasStarted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure Workout")
                         .font(.headline)
@@ -3368,8 +3408,9 @@ struct BoulderCampusTimerView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Configuration (only show if no sets completed and not resting)
-            if completedSets.isEmpty && !isResting && !showingAddSet {
+            // Configuration (only show if not started - no sets, not resting, not showing add set)
+            let hasStarted = !completedSets.isEmpty || isResting || showingAddSet
+            if !hasStarted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure Workout")
                         .font(.headline)
@@ -4550,8 +4591,9 @@ struct NxNTimerView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Configuration (only show if not started)
-            if !isRunning && currentSet == 0 && completedSets.isEmpty {
+            // Configuration (only show if not started - not running, no progress)
+            let hasStarted = isRunning || currentSet > 0 || !completedSets.isEmpty || problemsCompleted > 0 || showingGradeEntry
+            if !hasStarted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Configure Workout")
                         .font(.headline)

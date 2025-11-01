@@ -92,6 +92,12 @@ struct ExercisesView: View {
                 exercise.focus = .endurance
             case .warmup:
                 exercise.focus = .mobility
+            case .circuit:
+                exercise.focus = .endurance
+            case .core:
+                exercise.focus = .mobility
+            case .campusing:
+                exercise.focus = .power
             }
         }
     }
@@ -188,15 +194,6 @@ struct ExerciseDetailsView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-            case .hangboarding:
-                if let duration = exercise.duration,
-                   let sets = exercise.sets,
-                   let weight = exercise.addedWeight,
-                   let edgeSize = exercise.edgeSize {
-                    Text("\(duration)s × \(sets) sets × \(String(format: "%.1f", weight))kg × \(edgeSize)mm")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
             case .flexibility:
                 let areas = [
                     exercise.hamstrings ? "Hamstrings" : nil,
@@ -223,6 +220,30 @@ struct ExerciseDetailsView: View {
                     Text("\(duration) min")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                }
+            case .circuit:
+                if let sets = exercise.sets, let duration = exercise.duration {
+                    Text("\(sets) sets × \(duration)s")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            case .core:
+                if let sets = exercise.sets, let duration = exercise.duration {
+                    Text("\(sets) sets × \(duration)s")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            case .campusing:
+                if let sets = exercise.sets {
+                    if let edgeSize = exercise.edgeSize {
+                        Text("\(sets) sets × \(edgeSize)mm")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(sets) sets")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
         }

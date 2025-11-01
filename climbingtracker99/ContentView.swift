@@ -42,9 +42,9 @@ struct ContentView: View {
                     Label("Dashboard", systemImage: "chart.bar")
                 }
             
-            TrainingView()
+            ActivityView()
                 .tabItem {
-                    Label("Training", systemImage: "figure.climbing")
+                    Label("Activity", systemImage: "list.bullet.rectangle")
                 }
             
             MomentsView()

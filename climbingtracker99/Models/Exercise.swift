@@ -27,6 +27,9 @@ enum ExerciseType: String, CaseIterable, Codable {
     case flexibility = "Flexibility"
     case running = "Running"
     case warmup = "Warm Up"
+    case circuit = "Circuit"
+    case core = "Core"
+    case campusing = "Campusing"
     
     // Custom decoder to handle migration from old "Hangboarding (Max Hang)" to new name
     init(from decoder: Decoder) throws {
@@ -66,6 +69,12 @@ enum ExerciseType: String, CaseIterable, Codable {
             self = .running
         case "Warm Up":
             self = .warmup
+        case "Circuit":
+            self = .circuit
+        case "Core":
+            self = .core
+        case "Campusing":
+            self = .campusing
         default:
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot initialize ExerciseType from invalid String value \(rawValue)")
         }
@@ -109,6 +118,12 @@ enum ExerciseType: String, CaseIterable, Codable {
             return "running"
         case .warmup:
             return "flexibility" // Use flexibility icon for warmup
+        case .circuit:
+            return "boulder_campus" // Use boulder campus icon for circuit
+        case .core:
+            return "flexibility" // Use flexibility icon for core
+        case .campusing:
+            return "boulder_campus"
         }
     }
     
@@ -141,6 +156,12 @@ enum ExerciseType: String, CaseIterable, Codable {
             return ["Cardio", "Endurance", "Speed", "Recovery"]
         case .warmup:
             return ["Arms", "Fingers", "Back", "Legs", "Mobility", "Core"]
+        case .circuit:
+            return ["Free Climbing", "Time Based", "Endurance", "Technique"]
+        case .core:
+            return ["Abs", "Full Core", "Lower Back", "Obliques"]
+        case .campusing:
+            return ["Power", "Strength", "Coordination", "Dynamic"]
         }
     }
     
@@ -253,6 +274,21 @@ final class Exercise {
         case .warmup:
             self.duration = 10
             self.focus = .mobility
+        case .circuit:
+            self.duration = 60
+            self.sets = 3
+            self.restDuration = 60
+            self.focus = .endurance
+        case .core:
+            self.duration = 45
+            self.sets = 3
+            self.restDuration = 30
+            self.focus = .mobility
+        case .campusing:
+            self.sets = 3
+            self.restDuration = 60
+            self.edgeSize = 20
+            self.focus = .power
         }
     }
 } 

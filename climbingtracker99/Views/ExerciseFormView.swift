@@ -453,6 +453,9 @@ struct ExerciseFormView: View {
                 runningSection
             case .warmup:
                 warmupSection
+            case .circuit, .core, .campusing:
+                // These exercises use dedicated workout views, no form needed
+                EmptyView()
             }
         }
     }

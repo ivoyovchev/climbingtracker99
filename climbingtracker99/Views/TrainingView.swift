@@ -625,25 +625,36 @@ struct ExerciseRecordView: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Exercise Image
-                Image(recordedExercise.exercise.type.imageName)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 200)
-                    .clipped()
-                
-                ExerciseFormView(exercise: recordedExercise.exercise, 
-                               recordedExercise: recordedExercise,
-                               isRecording: true)
-            }
-            .navigationTitle("Record Exercise")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        isPresented = false
+        if recordedExercise.exercise.type == .circuit {
+            // Circuit gets its own dedicated view
+            CircuitViewWrapper(recordedExercise: recordedExercise, isPresented: $isPresented)
+        } else if recordedExercise.exercise.type == .core {
+            // Core gets its own dedicated view
+            CoreViewWrapper(recordedExercise: recordedExercise, isPresented: $isPresented)
+        } else if recordedExercise.exercise.type == .campusing {
+            // Campusing gets its own dedicated view
+            CampusingViewWrapper(recordedExercise: recordedExercise, isPresented: $isPresented)
+        } else {
+            NavigationView {
+                VStack(spacing: 0) {
+                    // Exercise Image
+                    Image(recordedExercise.exercise.type.imageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 200)
+                        .clipped()
+                    
+                    ExerciseFormView(exercise: recordedExercise.exercise, 
+                                   recordedExercise: recordedExercise,
+                                   isRecording: true)
+                }
+                .navigationTitle("Record Exercise")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            isPresented = false
+                        }
                     }
                 }
             }
@@ -727,6 +738,12 @@ struct ExerciseDetails: View {
                 RunningDetails(exercise: exercise, recordedExercise: recordedExercise)
             case .warmup:
                 WarmupDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .circuit:
+                CircuitDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .core:
+                CoreDetails(exercise: exercise, recordedExercise: recordedExercise)
+            case .campusing:
+                CampusingDetails(exercise: exercise, recordedExercise: recordedExercise)
             }
         }
     }
@@ -972,6 +989,205 @@ struct WarmupDetails: View {
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
+        }
+    }
+}
+
+struct CircuitViewWrapper: View {
+    @ObservedObject var recordedExercise: RecordedExercise
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        CircuitView(recordedExercise: Binding(
+            get: { recordedExercise },
+            set: { newValue in
+                // Update properties from newValue
+                recordedExercise.duration = newValue.duration
+                recordedExercise.sets = newValue.sets
+                recordedExercise.grade = newValue.grade
+                recordedExercise.notes = newValue.notes
+            }
+        ))
+        .onDisappear {
+            isPresented = false
+        }
+    }
+}
+
+struct CoreViewWrapper: View {
+    @ObservedObject var recordedExercise: RecordedExercise
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        CoreView(recordedExercise: Binding(
+            get: { recordedExercise },
+            set: { newValue in
+                // Update properties from newValue
+                recordedExercise.duration = newValue.duration
+                recordedExercise.sets = newValue.sets
+                recordedExercise.restDuration = newValue.restDuration
+                recordedExercise.notes = newValue.notes
+            }
+        ))
+        .onDisappear {
+            isPresented = false
+        }
+    }
+}
+
+struct CampusingViewWrapper: View {
+    @ObservedObject var recordedExercise: RecordedExercise
+    @Binding var isPresented: Bool
+    
+    var body: some View {
+        CampusingView(recordedExercise: Binding(
+            get: { recordedExercise },
+            set: { newValue in
+                // Update properties from newValue
+                recordedExercise.duration = newValue.duration
+                recordedExercise.sets = newValue.sets
+                recordedExercise.edgeSize = newValue.edgeSize
+                recordedExercise.restDuration = newValue.restDuration
+                recordedExercise.notes = newValue.notes
+            }
+        ))
+        .onDisappear {
+            isPresented = false
+        }
+    }
+}
+
+struct CoreDetails: View {
+    let exercise: Exercise
+    let recordedExercise: RecordedExercise?
+    
+    var body: some View {
+        let duration = recordedExercise?.duration ?? exercise.duration ?? 0
+        let sets = recordedExercise?.sets ?? exercise.sets ?? 0
+        let rest = recordedExercise?.restDuration ?? exercise.restDuration ?? 0
+        let notes = recordedExercise?.notes ?? ""
+        
+        if !notes.isEmpty {
+            Text(notes)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+        } else if sets > 0 && rest > 0 {
+            Text("\(sets) sets × \(formatDuration(duration)) work / \(Int(rest))s rest")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else if sets > 0 {
+            Text("\(sets) sets × \(formatDuration(duration))")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else if duration > 0 {
+            Text(formatDuration(duration))
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else {
+            Text("Core Training")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%dm", minutes)
+        }
+    }
+}
+
+struct CampusingDetails: View {
+    let exercise: Exercise
+    let recordedExercise: RecordedExercise?
+    
+    var body: some View {
+        let sets = recordedExercise?.sets ?? exercise.sets ?? 0
+        let edgeSize = recordedExercise?.edgeSize ?? exercise.edgeSize ?? 0
+        let notes = recordedExercise?.notes ?? ""
+        
+        if !notes.isEmpty {
+            Text(notes)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+        } else if sets > 0 && edgeSize > 0 {
+            Text("\(sets) sets × \(edgeSize)mm edge")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else if sets > 0 {
+            Text("\(sets) sets")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else {
+            Text("Campusing")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+}
+
+struct CircuitDetails: View {
+    let exercise: Exercise
+    let recordedExercise: RecordedExercise?
+    
+    var body: some View {
+        let duration = recordedExercise?.duration ?? exercise.duration ?? 0
+        let sets = recordedExercise?.sets ?? exercise.sets ?? 0
+        let grade = recordedExercise?.grade ?? exercise.grade ?? ""
+        let notes = recordedExercise?.notes ?? ""
+        
+        if !notes.isEmpty {
+            Text(notes)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+        } else if sets > 0 {
+            Text("\(sets) sets × \(formatDuration(duration))")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else if !grade.isEmpty {
+            Text("Grade: \(grade) × \(formatDuration(duration))")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else if duration > 0 {
+            Text(formatDuration(duration))
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        } else {
+            Text("Circuit Training")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%d:%02d", minutes, secs)
         }
     }
 }

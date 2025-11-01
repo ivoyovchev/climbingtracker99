@@ -85,6 +85,9 @@ private struct ExerciseParameterTrendsView: View {
         case .flexibility: return []
         case .running: return ["distance", "minutes"]
         case .warmup: return ["recordedDuration", "duration"]
+        case .circuit: return ["duration", "sets", "restDuration"]
+        case .core: return ["duration", "sets", "restDuration"]
+        case .campusing: return ["sets", "restDuration", "edgeSize"]
         }
     }
     

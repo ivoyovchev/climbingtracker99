@@ -9,6 +9,8 @@ struct GoalsEditView: View {
     @State private var targetTrainingsPerWeek: Int = 0
     @State private var targetWeight: Double = 0
     @State private var startingWeight: Double?
+    @State private var targetRunsPerWeek: Int? = 3
+    @State private var targetDistancePerWeek: Double? = 20.0
     
     @State private var newExerciseType: ExerciseType = .hangboarding
     @State private var newGripType: GripType = .halfCrimp
@@ -24,6 +26,25 @@ struct GoalsEditView: View {
             Form {
                 Section("Training Goals") {
                     Stepper("Target Trainings per Week: \(targetTrainingsPerWeek)", value: $targetTrainingsPerWeek, in: 0...7)
+                }
+                
+                Section("Running Goals") {
+                    Stepper("Target Runs per Week: \(targetRunsPerWeek ?? 3)", value: Binding(
+                        get: { targetRunsPerWeek ?? 3 },
+                        set: { targetRunsPerWeek = $0 }
+                    ), in: 0...7)
+                    
+                    HStack {
+                        Text("Target Distance per Week")
+                        Spacer()
+                        TextField("km", value: Binding(
+                            get: { targetDistancePerWeek ?? 20.0 },
+                            set: { targetDistancePerWeek = $0 }
+                        ), format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                    }
                 }
                 
                 Section("Weight Goals") {
@@ -135,6 +156,8 @@ struct GoalsEditView: View {
                 targetTrainingsPerWeek = goals.targetTrainingsPerWeek
                 targetWeight = goals.targetWeight
                 startingWeight = goals.startingWeight
+                targetRunsPerWeek = goals.targetRunsPerWeek ?? 3
+                targetDistancePerWeek = goals.targetDistancePerWeek ?? 20.0
             }
         }
     }
@@ -143,6 +166,8 @@ struct GoalsEditView: View {
         goals.targetTrainingsPerWeek = targetTrainingsPerWeek
         goals.targetWeight = targetWeight
         goals.startingWeight = startingWeight
+        goals.targetRunsPerWeek = targetRunsPerWeek
+        goals.targetDistancePerWeek = targetDistancePerWeek
         goals.lastUpdated = Date()
     }
     

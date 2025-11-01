@@ -160,6 +160,8 @@ final class Goals {
     var targetTrainingsPerWeek: Int
     var targetWeight: Double
     var startingWeight: Double?
+    var targetRunsPerWeek: Int?
+    var targetDistancePerWeek: Double? // in kilometers
     var lastUpdated: Date
     @Relationship(deleteRule: .cascade) var exerciseGoals: [ExerciseGoal]
     var techniqueGoals: [String]
@@ -172,6 +174,8 @@ final class Goals {
          targetTrainingsPerWeek: Int = 3, 
          targetWeight: Double = 0.0, 
          startingWeight: Double? = nil,
+         targetRunsPerWeek: Int = 3,
+         targetDistancePerWeek: Double = 20.0,
          lastUpdated: Date = Date(),
          exerciseGoals: [ExerciseGoal] = [],
          techniqueGoals: [String] = [],
@@ -183,6 +187,8 @@ final class Goals {
         self.targetTrainingsPerWeek = targetTrainingsPerWeek
         self.targetWeight = targetWeight
         self.startingWeight = startingWeight
+        self.targetRunsPerWeek = targetRunsPerWeek
+        self.targetDistancePerWeek = targetDistancePerWeek
         self.lastUpdated = lastUpdated
         self.exerciseGoals = exerciseGoals
         self.techniqueGoals = techniqueGoals
