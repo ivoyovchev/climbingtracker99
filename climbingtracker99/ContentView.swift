@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import WidgetKit
 import Charts
+import UserNotifications
 
 struct TabNavigationTitle: ViewModifier {
     let title: String
@@ -47,9 +48,9 @@ struct ContentView: View {
                     Label("Activity", systemImage: "list.bullet.rectangle")
                 }
             
-            MomentsView()
+            PlanView()
                 .tabItem {
-                    Label("Moments", systemImage: "photo.on.rectangle")
+                    Label("Plan", systemImage: "calendar")
                 }
             
             HealthView()
@@ -423,11 +424,120 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section(header: Text("Notifications")) {
+                    Toggle(isOn: Binding(
+                        get: { self.settings?.notificationsEnabled ?? true },
+                        set: { newValue in
+                            if let settings = self.settings {
+                                settings.notificationsEnabled = newValue
+                                NotificationManager.shared.syncSettings(
+                                    enabled: newValue,
+                                    reminderHours: settings.notificationReminderHours
+                                )
+                                
+                                // Update notification authorization and reschedule if enabled
+                                Task {
+                                    if newValue {
+                                        _ = await NotificationManager.shared.requestAuthorization()
+                                        // Reschedule all notifications
+                                        let trainingDescriptor = FetchDescriptor<PlannedTraining>()
+                                        let runDescriptor = FetchDescriptor<PlannedRun>()
+                                        if let trainings = try? modelContext.fetch(trainingDescriptor),
+                                           let runs = try? modelContext.fetch(runDescriptor) {
+                                            NotificationManager.shared.rescheduleAllNotifications(
+                                                trainings: trainings,
+                                                runs: runs
+                                            )
+                                        }
+                                    } else {
+                                        // Remove all pending notifications
+                                        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+                                    }
+                                }
+                            }
+                        }
+                    )) {
+                        HStack {
+                            Image(systemName: "bell")
+                            Text("Plan Reminders")
+                        }
+                    }
+                    
+                    if self.settings?.notificationsEnabled ?? true {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Reminder Time")
+                                Spacer()
+                                Text(formatReminderTime(self.settings?.notificationReminderHours ?? 1.5))
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Slider(
+                                value: Binding(
+                                    get: { self.settings?.notificationReminderHours ?? 1.5 },
+                                    set: { newValue in
+                                        if let settings = self.settings {
+                                            settings.notificationReminderHours = newValue
+                                            NotificationManager.shared.syncSettings(
+                                                enabled: settings.notificationsEnabled,
+                                                reminderHours: newValue
+                                            )
+                                            
+                                            // Reschedule all notifications with new time
+                                            Task {
+                                                let trainingDescriptor = FetchDescriptor<PlannedTraining>()
+                                                let runDescriptor = FetchDescriptor<PlannedRun>()
+                                                if let trainings = try? modelContext.fetch(trainingDescriptor),
+                                                   let runs = try? modelContext.fetch(runDescriptor) {
+                                                    NotificationManager.shared.rescheduleAllNotifications(
+                                                        trainings: trainings,
+                                                        runs: runs
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                ),
+                                in: 0.5...3.0,
+                                step: 0.5
+                            )
+                            
+                            HStack {
+                                Text("30 min")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("3 hours")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Button(action: {
+                            testNotification()
+                        }) {
+                            HStack {
+                                Image(systemName: "bell.badge")
+                                Text("Test Notification")
+                            }
+                        }
+                    }
+                }
+                
+                Section(header: Text("Media")) {
+                    NavigationLink(destination: MomentsView()) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Moments")
+                        }
+                    }
+                }
+                
                 Section(header: Text("About")) {
                     HStack {
                         Text("Version")
                         Spacer()
-                        Text("2.1.2")
+                        Text("2.1.3")
                             .foregroundColor(.gray)
                     }
                 }
@@ -520,6 +630,58 @@ struct SettingsView: View {
             settings.userName = ""
             settings.hasCompletedWelcome = false
             showingWelcome = true
+        }
+    }
+    
+    private func formatReminderTime(_ hours: Double) -> String {
+        if hours == 1.0 {
+            return "1 hour before"
+        } else if hours < 1.0 {
+            let minutes = Int(hours * 60)
+            return "\(minutes) min before"
+        } else {
+            let wholeHours = Int(hours)
+            let minutes = Int((hours - Double(wholeHours)) * 60)
+            if minutes > 0 {
+                return "\(wholeHours)h \(minutes)m before"
+            } else {
+                return String(format: "%.1f hours before", hours)
+            }
+        }
+    }
+    
+    private func testNotification() {
+        Task {
+            // Request authorization if needed
+            let authorized = await NotificationManager.shared.requestAuthorization()
+            
+            guard authorized else {
+                print("Notification authorization denied")
+                return
+            }
+            
+            // Verify delegate is set
+            if UNUserNotificationCenter.current().delegate == nil {
+                UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+            }
+            
+            // Small delay to ensure everything is ready
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            
+            // Check if we have any plans to base the test on
+            let trainingDescriptor = FetchDescriptor<PlannedTraining>(sortBy: [SortDescriptor(\.date)])
+            let runDescriptor = FetchDescriptor<PlannedRun>(sortBy: [SortDescriptor(\.date)])
+            
+            if let nextTraining = try? modelContext.fetch(trainingDescriptor).first {
+                // Show test notification based on next training
+                NotificationManager.shared.sendTestNotification(for: nextTraining)
+            } else if let nextRun = try? modelContext.fetch(runDescriptor).first {
+                // Show test notification based on next run
+                NotificationManager.shared.sendTestNotification(for: nextRun)
+            } else {
+                // Send a generic test notification
+                NotificationManager.shared.sendTestNotification()
+            }
         }
     }
 }

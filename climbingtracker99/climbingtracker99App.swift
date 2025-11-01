@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import UserNotifications
 
 @main
 struct climbingtracker99App: App {
@@ -27,7 +28,9 @@ struct climbingtracker99App: App {
                 RecordedExercise.self,
                 Meal.self,
                 MoonLogEntry.self,
-                RunningSession.self
+                RunningSession.self,
+                PlannedTraining.self,
+                PlannedRun.self
             ])
             
             let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -44,6 +47,9 @@ struct climbingtracker99App: App {
             
             // Update widget data on app launch
             updateWidgetData()
+            
+            // Set notification delegate to show notifications in foreground
+            UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
         } catch {
             fatalError("Could not initialize ModelContainer: \(error)")
         }
@@ -275,5 +281,27 @@ struct AppContentView: View {
             exerciseGoals: []
         )
         modelContext.insert(defaultGoals)
+    }
+}
+
+// Notification delegate to show notifications even when app is in foreground
+class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+    
+    override init() {
+        super.init()
+    }
+    
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Show notification even when app is in foreground with banner, sound, and badge
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
+    }
+    
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        completionHandler()
     }
 }

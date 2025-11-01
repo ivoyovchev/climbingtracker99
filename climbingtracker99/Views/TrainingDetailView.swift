@@ -738,15 +738,6 @@ struct RecordedExerciseDetailsView: View {
                 if exercise.legs {
                     DetailRow(label: "Legs", value: "Yes")
                 }
-                
-            default:
-                // Generic details for other exercise types
-                if let duration = exercise.recordedDuration ?? exercise.duration {
-                    DetailRow(label: "Duration", value: formatDuration(duration))
-                }
-                if let sets = exercise.sets {
-                    DetailRow(label: "Sets", value: "\(sets)")
-                }
             }
         }
     }
