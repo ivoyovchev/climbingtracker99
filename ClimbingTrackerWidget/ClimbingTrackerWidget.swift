@@ -208,13 +208,13 @@ struct GoalCircleView: View {
             ZStack {
                 // Background circle
                 Circle()
-                    .stroke(color.opacity(0.15), lineWidth: 3)
+                    .stroke(color.opacity(0.15), lineWidth: 5)
                     .frame(width: 45, height: 45)
                 
                 // Progress circle
                 Circle()
                     .trim(from: 0, to: max(0, min(1, progress)))
-                    .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .frame(width: 45, height: 45)
                     .rotationEffect(.degrees(-90))
                 

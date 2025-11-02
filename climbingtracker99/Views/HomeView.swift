@@ -78,6 +78,8 @@ struct HomeView: View {
     @Query(sort: \RunningSession.startTime, order: .reverse) private var runningSessions: [RunningSession]
     @Query(sort: \WeightEntry.date, order: .reverse) private var weightEntries: [WeightEntry]
     @Query(sort: \PlannedBenchmark.date) private var plannedBenchmarks: [PlannedBenchmark]
+    @Query(sort: \PlannedTraining.date) private var plannedTrainings: [PlannedTraining]
+    @Query(sort: \PlannedRun.date) private var plannedRuns: [PlannedRun]
     @Query private var goals: [Goals]
     
     @State private var showingGoalsSheet = false
@@ -173,6 +175,79 @@ struct HomeView: View {
                 run.startTime >= startOfWeek && run.startTime <= endOfWeek
             }
             .reduce(0.0) { $0 + $1.distanceInKm }
+    }
+    
+    // Enum to represent the next activity type
+    enum NextActivity {
+        case training(PlannedTraining)
+        case run(PlannedRun)
+        case benchmark(PlannedBenchmark)
+        
+        var date: Date {
+            switch self {
+            case .training(let t): return t.date
+            case .run(let r): return r.date
+            case .benchmark(let b): return b.date
+            }
+        }
+        
+        var estimatedTimeOfDay: Date {
+            switch self {
+            case .training(let t): return t.estimatedTimeOfDay
+            case .run(let r): return r.estimatedTimeOfDay
+            case .benchmark(let b): return b.estimatedTimeOfDay
+            }
+        }
+        
+        func getDateTime(calendar: Calendar) -> Date {
+            let activityDate = calendar.startOfDay(for: date)
+            let activityTime = estimatedTimeOfDay
+            return calendar.date(
+                bySettingHour: calendar.component(.hour, from: activityTime),
+                minute: calendar.component(.minute, from: activityTime),
+                second: 0,
+                of: activityDate
+            ) ?? activityDate
+        }
+    }
+    
+    // Get next upcoming activity (training, run, or benchmark)
+    private var nextActivity: NextActivity? {
+        let now = Date()
+        let calendar = Calendar.current
+        
+        var allActivities: [NextActivity] = []
+        
+        // Add trainings
+        for training in plannedTrainings {
+            let trainingDateTime = NextActivity.training(training).getDateTime(calendar: calendar)
+            if trainingDateTime >= now {
+                allActivities.append(.training(training))
+            }
+        }
+        
+        // Add runs
+        for run in plannedRuns {
+            let runDateTime = NextActivity.run(run).getDateTime(calendar: calendar)
+            if runDateTime >= now {
+                allActivities.append(.run(run))
+            }
+        }
+        
+        // Add benchmarks (only non-completed ones)
+        for benchmark in plannedBenchmarks where !benchmark.completed {
+            let benchmarkDateTime = NextActivity.benchmark(benchmark).getDateTime(calendar: calendar)
+            if benchmarkDateTime >= now {
+                allActivities.append(.benchmark(benchmark))
+            }
+        }
+        
+        // Sort by date/time and return the first one
+        return allActivities.sorted { activity1, activity2 in
+            let dateTime1 = activity1.getDateTime(calendar: calendar)
+            let dateTime2 = activity2.getDateTime(calendar: calendar)
+            return dateTime1 < dateTime2
+        }.first
     }
     
     // Check for and recover any partial run data from crash
@@ -284,6 +359,11 @@ struct HomeView: View {
     private var mainContent: some View {
         VStack(spacing: 20) {
             trainingActionsSection
+            
+            // Next Activity Section
+            if let next = nextActivity {
+                NextActivityView(activity: next)
+            }
             
             GoalsSectionView(goals: userGoals, trainingProgress: trainingProgress, runsThisWeek: runsThisWeek, distanceThisWeek: distanceThisWeek, currentWeight: currentWeight, showingGoalsSheet: $showingGoalsSheet)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -534,5 +614,140 @@ struct ActionCard: View {
                     isPressed = false
                 }
         )
+    }
+}
+
+// MARK: - Next Activity View
+
+struct NextActivityView: View {
+    let activity: HomeView.NextActivity
+    
+    // Helper to format time
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+    
+    // Format relative date (Today, Tomorrow, or date)
+    private func formatRelativeDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        
+        if calendar.isDateInToday(date) {
+            return "Today"
+        } else if calendar.isDateInTomorrow(date) {
+            return "Tomorrow"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d"
+            return formatter.string(from: date)
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Next Activity")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            .padding(.horizontal)
+            
+            Group {
+                switch activity {
+                case .training(let training):
+                    HStack(spacing: 12) {
+                        Image(systemName: "figure.climbing")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                            .frame(width: 40)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            if training.exerciseTypes.count == 1 {
+                                Text(training.exerciseTypes.first?.displayName ?? "Training")
+                                    .font(.headline)
+                            } else {
+                                Text("\(training.exerciseTypes.count) Exercises")
+                                    .font(.headline)
+                                
+                                Text(training.exerciseTypes.prefix(3).map { $0.displayName }.joined(separator: ", "))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Label("\(formatRelativeDate(training.date)) at \(formatTime(training.estimatedTimeOfDay))", systemImage: "calendar")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Label("\(training.estimatedDuration) min", systemImage: "clock")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                case .run(let run):
+                    HStack(spacing: 12) {
+                        Image(systemName: "figure.run")
+                            .font(.title2)
+                            .foregroundColor(.green)
+                            .frame(width: 40)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(run.runningType.rawValue)
+                                .font(.headline)
+                            
+                            HStack(spacing: 12) {
+                                Label("\(formatRelativeDate(run.date)) at \(formatTime(run.estimatedTimeOfDay))", systemImage: "calendar")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Label(String(format: "%.1f km", run.estimatedDistance), systemImage: "map")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                if let tempo = run.estimatedTempo {
+                                    Label(String(format: "%.1f min/km", tempo), systemImage: "gauge")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                case .benchmark(let benchmark):
+                    HStack(spacing: 12) {
+                        Image(systemName: benchmark.benchmarkType.iconName)
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                            .frame(width: 40)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(benchmark.benchmarkType.displayName)
+                                .font(.headline)
+                            
+                            HStack(spacing: 12) {
+                                Label("\(formatRelativeDate(benchmark.date)) at \(formatTime(benchmark.estimatedTimeOfDay))", systemImage: "calendar")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+            .padding(.horizontal)
+        }
     }
 } 

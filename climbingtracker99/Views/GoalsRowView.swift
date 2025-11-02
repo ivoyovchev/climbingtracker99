@@ -213,10 +213,6 @@ struct GoalCard: View {
         .padding(12)
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.separator), lineWidth: 0.5)
-        )
         .cornerRadius(12)
     }
 } 

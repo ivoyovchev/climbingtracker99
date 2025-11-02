@@ -504,8 +504,8 @@ struct RecordedExerciseDetailsView: View {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.caption)
                                             .foregroundColor(.green)
-                                    }
-                                }
+                    }
+                }
                             }
                         }
                         .padding(.top, 4)
@@ -515,15 +515,15 @@ struct RecordedExerciseDetailsView: View {
                     if let boardType = exercise.boardType {
                         DetailRow(label: "Board Type", value: boardType.rawValue)
                     }
-                    if let grade = exercise.grade {
-                        DetailRow(label: "Grade", value: grade)
-                    }
-                    if let routes = exercise.routes {
-                        DetailRow(label: "Routes", value: "\(routes)")
-                    }
-                    if let attempts = exercise.attempts {
-                        DetailRow(label: "Attempts", value: "\(attempts)")
-                    }
+                if let grade = exercise.grade {
+                    DetailRow(label: "Grade", value: grade)
+                }
+                if let routes = exercise.routes {
+                    DetailRow(label: "Routes", value: "\(routes)")
+                }
+                if let attempts = exercise.attempts {
+                    DetailRow(label: "Attempts", value: "\(attempts)")
+                }
                 }
                 
             case .limitBouldering:

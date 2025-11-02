@@ -2,7 +2,20 @@
 
 A comprehensive climbing training and progress tracking app for iOS.
 
-## Version 2.2.0
+## Version 2.2.1
+
+### New Features (v2.2.1)
+- **Next Activity Dashboard Card** - Highlights the upcoming training, run, or benchmark with the same card styling used in the Plan tab.
+- **Integrated Activity Detection** - Automatically surfaces whichever plan is scheduled next, including time, duration, distance, and benchmark specifics.
+- **Widget & UI Refinements** - Thicker progress rings on the Home Screen widget and seamless dashboard goal tiles for a cleaner layout.
+
+### Version 2.2.1 Updates
+- Added "Next Activity" dashboard card that surfaces the upcoming training, run, or benchmark.
+- Included run and benchmark plans in the next-activity detection logic.
+- Thicker widget progress rings for better readability.
+- Removed borders from dashboard goal tiles for a seamless layout.
+
+### Version 2.2.0
 
 ### New Features (v2.2.0)
 - **Benchmarks Feature** - Comprehensive benchmark testing and progress tracking:
