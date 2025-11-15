@@ -13,7 +13,7 @@ enum BoardType: String, CaseIterable, Codable {
     case frankieBoard = "FrankieBoard"
 }
 
-enum ExerciseType: String, CaseIterable, Codable {
+enum ExerciseType: String, CaseIterable, Codable, Comparable {
     case hangboarding = "Hangboarding (Max Hang)"
     case repeaters = "Repeaters"
     case limitBouldering = "Limit Bouldering"
@@ -31,6 +31,10 @@ enum ExerciseType: String, CaseIterable, Codable {
     case core = "Core"
     case campusing = "Campusing"
     case benchmark = "Benchmark"
+    
+    static func < (lhs: ExerciseType, rhs: ExerciseType) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
     
     // Custom decoder to handle migration from old "Hangboarding (Max Hang)" to new name
     init(from decoder: Decoder) throws {

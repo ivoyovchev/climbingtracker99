@@ -41,6 +41,7 @@ struct WeightGraphView: View {
                             y: .value("Weight", entry.weight)
                         )
                         .foregroundStyle(.blue)
+                        .symbolSize(32)
                     }
                 }
                 .chartYScale(domain: yAxisRange)

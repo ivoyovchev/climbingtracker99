@@ -14,6 +14,7 @@ enum RunningType: String, CaseIterable, Codable {
 
 @Model
 final class PlannedTraining {
+    var syncIdentifier: String?
     var date: Date
     var trainingType: ExerciseType // Keep for backward compatibility
     var exerciseTypesData: String = "" // JSON array of ExerciseType rawValues
@@ -67,7 +68,8 @@ final class PlannedTraining {
         }
     }
     
-    init(date: Date, exerciseTypes: [ExerciseType], estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil) {
+    init(date: Date, exerciseTypes: [ExerciseType], estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil, syncIdentifier: String? = nil) {
+        self.syncIdentifier = syncIdentifier ?? UUID().uuidString
         self.date = date
         self.trainingType = exerciseTypes.first ?? .hangboarding // Fallback
         self.estimatedDuration = estimatedDuration
@@ -77,7 +79,8 @@ final class PlannedTraining {
     }
     
     // Convenience initializer for single exercise (backward compatibility)
-    init(date: Date, trainingType: ExerciseType, estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil) {
+    init(date: Date, trainingType: ExerciseType, estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil, syncIdentifier: String? = nil) {
+        self.syncIdentifier = syncIdentifier ?? UUID().uuidString
         self.date = date
         self.trainingType = trainingType
         self.estimatedDuration = estimatedDuration
@@ -89,6 +92,7 @@ final class PlannedTraining {
 
 @Model
 final class PlannedRun {
+    var syncIdentifier: String?
     var date: Date
     var runningType: RunningType
     var estimatedDistance: Double // in km
@@ -120,7 +124,8 @@ final class PlannedRun {
         }
     }
     
-    init(date: Date, runningType: RunningType, estimatedDistance: Double, estimatedTempo: Double? = nil, estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil) {
+    init(date: Date, runningType: RunningType, estimatedDistance: Double, estimatedTempo: Double? = nil, estimatedDuration: Int, estimatedTime: Date? = nil, notes: String? = nil, syncIdentifier: String? = nil) {
+        self.syncIdentifier = syncIdentifier ?? UUID().uuidString
         self.date = date
         self.runningType = runningType
         self.estimatedDistance = estimatedDistance

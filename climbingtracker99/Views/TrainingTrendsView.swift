@@ -9,6 +9,7 @@ enum TrendsGranularity: String, CaseIterable {
 
 struct TrainingTrendsView: View {
     let trainings: [Training]
+    let runs: [RunningSession]
     var weeklyTarget: Int? = nil
     @State private var granularity: TrendsGranularity = .weekly
     @State private var showMovingAverage: Bool = true
@@ -16,17 +17,28 @@ struct TrainingTrendsView: View {
     
     // MARK: - Metrics
     private var totalMinutes: Int {
-        trainings.map { $0.duration }.reduce(0, +)
+        let trainingMinutes = trainings.map { $0.duration }.reduce(0, +)
+        let runMinutes = runs.map { Int($0.duration / 60.0) }.reduce(0, +)
+        return trainingMinutes + runMinutes
     }
     
     private var longestSessionMinutes: Int {
-        trainings.map { $0.duration }.max() ?? 0
+        let trainingMax = trainings.map { $0.duration }.max() ?? 0
+        let runMax = runs.map { Int($0.duration / 60.0) }.max() ?? 0
+        return max(trainingMax, runMax)
     }
     
+    private var allSessionDays: [Date] {
+        let cal = Calendar.current
+        let trainingDays = trainings.map { cal.startOfDay(for: $0.date) }
+        let runDays = runs.map { cal.startOfDay(for: $0.startTime) }
+        return trainingDays + runDays
+    }
+
     private var currentStreakDays: Int {
         // Count consecutive days ending today (or yesterday if no training today)
         let cal = Calendar.current
-        let daySet = Set(trainings.map { cal.startOfDay(for: $0.date) })
+        let daySet = Set(allSessionDays)
         guard !daySet.isEmpty else { return 0 }
         let today = cal.startOfDay(for: Date())
         let start = daySet.contains(today) ? today : cal.date(byAdding: .day, value: -1, to: today)!
@@ -41,9 +53,7 @@ struct TrainingTrendsView: View {
     
     private var longestStreakDays: Int {
         let cal = Calendar.current
-        let days = trainings
-            .map { cal.startOfDay(for: $0.date) }
-            .sorted()
+        let days = allSessionDays.sorted()
         guard !days.isEmpty else { return 0 }
         var longest = 1
         var current = 1
@@ -59,79 +69,94 @@ struct TrainingTrendsView: View {
     }
     
     private var maxWorkoutsInAWeek: Int {
-        weeklyBuckets(last: 256).map { $0.count }.max() ?? 0
+        weeklyBuckets(last: 256).map { $0.totalCount }.max() ?? 0
     }
     
     private var maxWorkoutsInAMonth: Int {
-        monthlyBuckets(last: 256).map { $0.count }.max() ?? 0
+        monthlyBuckets(last: 256).map { $0.totalCount }.max() ?? 0
     }
     
     // MARK: - Aggregation
-    private func weekKey(for date: Date) -> (year: Int, week: Int) {
-        let cal = Calendar.iso8601
-        let year = cal.component(.yearForWeekOfYear, from: date)
-        let week = cal.component(.weekOfYear, from: date)
-        return (year, week)
+
+    private struct PeriodData {
+        let date: Date
+        let trainingCount: Int
+        let runCount: Int
+        var totalCount: Int { trainingCount + runCount }
     }
-    
-    private func monthKey(for date: Date) -> (year: Int, month: Int) {
-        let cal = Calendar.current
-        let y = cal.component(.year, from: date)
-        let m = cal.component(.month, from: date)
-        return (y, m)
+
+    private struct IndexedPeriod {
+        let index: Int
+        let period: PeriodData
     }
-    
-    private func startOfWeek(year: Int, week: Int) -> Date? {
-        var comps = DateComponents()
-        comps.weekOfYear = week
-        comps.yearForWeekOfYear = year
-        comps.weekday = 2 // Monday
-        return Calendar.iso8601.date(from: comps)
-    }
-    
-    private func startOfMonth(year: Int, month: Int) -> Date? {
-        var comps = DateComponents()
-        comps.year = year
-        comps.month = month
-        comps.day = 1
-        return Calendar.current.date(from: comps)
-    }
-    
-    private func weeklyBuckets(last n: Int = 12) -> [(date: Date, count: Int)] {
-        // Group counts by ISO week
-        var grouped: [String: Int] = [:]
-        var dateMap: [String: Date] = [:]
-        for t in trainings {
-            let key = weekKey(for: t.date)
-            if let d = startOfWeek(year: key.year, week: key.week) {
-                let id = "\(key.year)-W\(key.week)"
-                grouped[id, default: 0] += 1
-                dateMap[id] = d
-            }
+
+    private func weeklyBuckets(last n: Int = 12) -> [PeriodData] {
+        var grouped: [Date: (training: Int, run: Int)] = [:]
+        for training in trainings {
+            let weekStart = Calendar.iso8601.startOfWeek(for: training.date)
+            var counts = grouped[weekStart] ?? (0, 0)
+            counts.training += 1
+            grouped[weekStart] = counts
         }
-        let sorted = dateMap
-            .map { ($0.value, grouped[$0.key] ?? 0) }
-            .sorted { $0.0 < $1.0 }
-        let sliced = sorted.suffix(n)
-        return Array(sliced)
-    }
-    
-    private func monthlyBuckets(last n: Int = 12) -> [(date: Date, count: Int)] {
-        var grouped: [String: Int] = [:]
-        var dateMap: [String: Date] = [:]
-        for t in trainings {
-            let key = monthKey(for: t.date)
-            if let d = startOfMonth(year: key.year, month: key.month) {
-                let id = "\(key.year)-\(key.month)"
-                grouped[id, default: 0] += 1
-                dateMap[id] = d
-            }
+        for run in runs {
+            let weekStart = Calendar.iso8601.startOfWeek(for: run.startTime)
+            var counts = grouped[weekStart] ?? (0, 0)
+            counts.run += 1
+            grouped[weekStart] = counts
         }
-        let sorted = dateMap
-            .map { ($0.value, grouped[$0.key] ?? 0) }
-            .sorted { $0.0 < $1.0 }
-        let sliced = sorted.suffix(n)
-        return Array(sliced)
+        let sortedKeys = grouped.keys.sorted()
+        let periods = sortedKeys.map { key in
+            let counts = grouped[key] ?? (0, 0)
+            return PeriodData(date: key, trainingCount: counts.training, runCount: counts.run)
+        }
+        return Array(periods.suffix(n))
+    }
+
+    private func monthlyBuckets(last n: Int = 12) -> [PeriodData] {
+        func startOfMonth(for date: Date) -> Date {
+            let comps = Calendar.current.dateComponents([.year, .month], from: date)
+            return Calendar.current.date(from: comps) ?? date
+        }
+        var grouped: [Date: (training: Int, run: Int)] = [:]
+        for training in trainings {
+            let monthStart = startOfMonth(for: training.date)
+            var counts = grouped[monthStart] ?? (0, 0)
+            counts.training += 1
+            grouped[monthStart] = counts
+        }
+        for run in runs {
+            let monthStart = startOfMonth(for: run.startTime)
+            var counts = grouped[monthStart] ?? (0, 0)
+            counts.run += 1
+            grouped[monthStart] = counts
+        }
+        let sortedKeys = grouped.keys.sorted()
+        let periods = sortedKeys.map { key in
+            let counts = grouped[key] ?? (0, 0)
+            return PeriodData(date: key, trainingCount: counts.training, runCount: counts.run)
+        }
+        return Array(periods.suffix(n))
+    }
+
+    private func periods(for granularity: TrendsGranularity) -> [PeriodData] {
+        switch granularity {
+        case .weekly:
+            return weeklyBuckets(last: 16)
+        case .monthly:
+            return monthlyBuckets(last: 12)
+        }
+    }
+
+    private func movingAverageSeries(indexedPeriods: [IndexedPeriod], granularity: TrendsGranularity) -> [(index: Int, value: Double)] {
+        let counts = indexedPeriods.map { $0.period.totalCount }
+        let window = granularity == .weekly ? 4 : 3
+        let values = movingAverage(values: counts, window: window)
+        guard values.count > 0 else { return [] }
+        return values.enumerated().map { idx, value in
+            let periodIdx = idx + max(0, window - 1)
+            let clampedIdx = min(periodIdx, indexedPeriods.count - 1)
+            return (index: indexedPeriods[clampedIdx].index, value: value)
+        }
     }
     
     private func movingAverage(values: [Int], window: Int) -> [Double] {
@@ -177,76 +202,35 @@ struct TrainingTrendsView: View {
             )
             .padding(.horizontal)
             
-            let data: [(date: Date, count: Int)] = {
-                switch granularity {
-                case .weekly: return weeklyBuckets(last: 16)
-                case .monthly: return monthlyBuckets(last: 12)
-                }
-            }()
+            let periods = periods(for: granularity)
+            let indexedPeriods = periods.enumerated().map { IndexedPeriod(index: $0.offset, period: $0.element) }
+            let shouldShowFocusMix = granularity == .weekly && showFocusMix
+            let activityPoints = shouldShowFocusMix ? weeklyActivityPoints(indexedPeriods: indexedPeriods) : []
+            let movingAverageValues = showMovingAverage ? movingAverageSeries(indexedPeriods: indexedPeriods, granularity: granularity) : []
+            let focusStyleScale: KeyValuePairs<String, Color> = shouldShowFocusMix ? [
+                ActivityCategory.training.rawValue: Color.blue.opacity(0.75),
+                ActivityCategory.run.rawValue: Color.green.opacity(0.75)
+            ] : [:]
             
-            if data.isEmpty {
+            if periods.isEmpty {
                 Text("No training data yet")
                     .foregroundColor(.secondary)
                     .padding(.horizontal)
             } else {
                 Chart {
-                    if granularity == .weekly && showFocusMix {
-                        // Replace totals with stacked focus bars when Focus mix is on
-                        let focusPoints = weeklyFocusPoints(weeks: data.map { $0.date })
-                        ForEach(focusPoints, id: \.id) { p in
-                            BarMark(
-                                x: .value("Week", p.date),
-                                y: .value("Count", p.count),
-                                stacking: .standard
-                            )
-                            .foregroundStyle(by: .value("Focus", p.focus.rawValue))
-                        }
-                    } else {
-                        // Default: totals per period
-                        ForEach(data, id: \.date) { point in
-                            BarMark(
-                                x: .value("Period", point.date),
-                                y: .value("Workouts", point.count)
-                            )
-                            .foregroundStyle(Color.blue.opacity(0.7))
-                        }
-                    }
-                    
-                    if showMovingAverage {
-                        let counts = data.map { $0.count }
-                        let window = granularity == .weekly ? 4 : 3
-                        let ma = movingAverage(values: counts, window: window)
-                        if ma.count > 0 {
-                            ForEach(Array(ma.enumerated()), id: \.offset) { idx, val in
-                                // Align MA points to the last dates in the window
-                                let xDate = data[idx + (window - 1)].date
-                                LineMark(
-                                    x: .value("Period", xDate),
-                                    y: .value("MA", val)
-                                )
-                                .foregroundStyle(Color.orange)
-                                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
-                                PointMark(
-                                    x: .value("Period", xDate),
-                                    y: .value("MA", val)
-                                )
-                                .foregroundStyle(Color.orange)
-                            }
-                        }
-                    }
+                    barContent(indexedPeriods: indexedPeriods, shouldShowFocusMix: shouldShowFocusMix, activityPoints: activityPoints)
+                    movingAverageContent(entries: movingAverageValues)
                 }
+                .chartForegroundStyleScale(focusStyleScale)
                 .chartXAxis {
-                    AxisMarks(values: data.map { $0.date }) { value in
+                    let values = indexedPeriods.map { Double($0.index) }
+                    AxisMarks(values: values) { value in
                         AxisGridLine()
-                        AxisValueLabel() {
-                            if let date = value.as(Date.self) {
-                                if granularity == .weekly {
-                                    let initial = monthInitial(for: date)
-                                    let wom = Calendar.current.component(.weekOfMonth, from: date)
-                                    Text("\(initial)\(wom)")
-                                } else {
-                                    let initial = monthInitial(for: date)
-                                    Text(initial)
+                        AxisValueLabel {
+                            if let doubleValue = value.as(Double.self) {
+                                let idx = Int(doubleValue.rounded())
+                                if let period = indexedPeriods.first(where: { $0.index == idx }) {
+                                    Text(periodLabel(for: period.period, granularity: granularity))
                                 }
                             }
                         }
@@ -255,61 +239,74 @@ struct TrainingTrendsView: View {
                 .chartYAxis {
                     AxisMarks(position: .leading)
                 }
+                .chartXScale(domain: xDomain(for: indexedPeriods))
+                .chartPlotStyle { plotArea in
+                    plotArea.frame(maxWidth: .infinity, alignment: .leading)
+                }
                 .frame(height: 220)
                 .padding(.horizontal)
                 
+                let totalCount = periods.map { $0.totalCount }.reduce(0, +)
                 HStack(spacing: 16) {
-                    Toggle(isOn: $showMovingAverage) { Text("Moving average") }
+                    Toggle(isOn: $showMovingAverage) { Text("Avg.") }
                         .toggleStyle(SwitchToggleStyle(tint: .orange))
                     if granularity == .weekly {
-                        Toggle(isOn: $showFocusMix) { Text("Focus mix") }
-                            .toggleStyle(SwitchToggleStyle(tint: .purple))
+                        Toggle(isOn: $showFocusMix) {
+                            Text("Details")
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .purple))
                     }
                     Spacer()
-                    if let total = data.map({ $0.count }).reduce(0, +) as Int? {
-                        Text("Total: \(total)")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                    }
+                    Text("Total: \(totalCount)")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
                 .padding(.horizontal)
             }
             
             // 12-week heatmap
-            TrainingHeatmapView(trainings: trainings, weeklyTarget: weeklyTarget)
+            TrainingHeatmapView(trainings: trainings, runs: runs, weeklyTarget: weeklyTarget)
                 .padding(.horizontal)
                 .padding(.bottom, 8)
         }
     }
 }
 
-// Build weekly focus points aligned to specific week-start dates
-private struct FocusOverlayPoint {
+// Build weekly activity points aligned to specific week-start dates
+private enum ActivityCategory: String, CaseIterable {
+    case training = "Training"
+    case run = "Runs"
+}
+
+private struct ActivityPoint {
     let id = UUID()
+    let index: Int
     let date: Date
-    let focus: TrainingFocus
+    let category: ActivityCategory
     let count: Int
 }
 
 private extension TrainingTrendsView {
-    func weeklyFocusPoints(weeks: [Date]) -> [FocusOverlayPoint] {
-        // Map week start -> focus counts
-        var map: [Date: [TrainingFocus: Int]] = [:]
-        for t in trainings {
-            let weekStart = Calendar.iso8601.startOfWeek(for: t.date)
-            var inner = map[weekStart] ?? [:]
-            inner[t.focus, default: 0] += 1
-            map[weekStart] = inner
-        }
-        var points: [FocusOverlayPoint] = []
-        for week in weeks {
-            if let entries = map[week] {
-                for (focus, cnt) in entries {
-                    points.append(FocusOverlayPoint(date: week, focus: focus, count: cnt))
-                }
+    var currentWeekCounts: (training: Int, runs: Int) {
+        let cal = Calendar.iso8601
+        let start = cal.startOfWeek(for: Date())
+        let end = cal.date(byAdding: .day, value: 7, to: start) ?? start
+        let trainingCount = trainings.filter { $0.date >= start && $0.date < end }.count
+        let runCount = runs.filter { $0.startTime >= start && $0.startTime < end }.count
+        return (trainingCount, runCount)
+    }
+    
+    private func weeklyActivityPoints(indexedPeriods: [IndexedPeriod]) -> [ActivityPoint] {
+        indexedPeriods.flatMap { item -> [ActivityPoint] in
+            var points: [ActivityPoint] = []
+            if item.period.trainingCount > 0 {
+                points.append(ActivityPoint(index: item.index, date: item.period.date, category: .training, count: item.period.trainingCount))
             }
+            if item.period.runCount > 0 {
+                points.append(ActivityPoint(index: item.index, date: item.period.date, category: .run, count: item.period.runCount))
+            }
+            return points
         }
-        return points
     }
 }
 
@@ -339,8 +336,19 @@ private extension Calendar {
             }
             return items
         }()
+        @State var sampleRuns: [RunningSession] = {
+            var runs: [RunningSession] = []
+            let cal = Calendar.current
+            for i in 0..<12 {
+                if let d = cal.date(byAdding: .day, value: -i * 5, to: Date()) {
+                    let session = RunningSession(startTime: d, duration: 45 * 60, distance: 8000)
+                    runs.append(session)
+                }
+            }
+            return runs
+        }()
         var body: some View {
-            TrainingTrendsView(trainings: sample)
+            TrainingTrendsView(trainings: sample, runs: sampleRuns)
         }
     }
     return Wrapper()
@@ -390,6 +398,7 @@ private struct MetricCard: View {
 
 private struct TrainingHeatmapView: View {
     let trainings: [Training]
+    let runs: [RunningSession]
     var weeklyTarget: Int? = nil
     @State private var selectedWeek: WeekSelection?
     @State private var tooltip: TooltipData?
@@ -414,6 +423,10 @@ private struct TrainingHeatmapView: View {
             let d = cal.startOfDay(for: t.date)
             counts[d, default: 0] += 1
         }
+        for run in runs {
+            let d = cal.startOfDay(for: run.startTime)
+            counts[d, default: 0] += 1
+        }
         return counts
     }
     
@@ -431,8 +444,10 @@ private struct TrainingHeatmapView: View {
         guard let target = target, target > 0 else { return false }
         let cal = Calendar.current
         let start = cal.startOfDay(for: weekStart)
-        let end = cal.startOfDay(for: Calendar.iso8601.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart)
-        let count = trainings.filter { $0.date >= start && $0.date <= end }.count
+        let end = cal.startOfDay(for: Calendar.iso8601.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart)
+        let trainingCount = trainings.filter { $0.date >= start && $0.date < end }.count
+        let runCount = runs.filter { $0.startTime >= start && $0.startTime < end }.count
+        let count = trainingCount + runCount
         return count >= target
     }
     
@@ -449,6 +464,8 @@ private struct TrainingHeatmapView: View {
                     // Weekday labels
                     let boxSize: CGFloat = 16
                     VStack(spacing: 6) {
+                        Spacer()
+                            .frame(height: boxSize + 6)
                         ForEach(0..<7, id: \.self) { i in
                             let labels = ["M","T","W","T","F","S","S"]
                             Text(labels[i])
@@ -501,10 +518,14 @@ private struct TrainingHeatmapView: View {
                                                                     let title = "\(weekStart.formatted(date: .abbreviated, time: .omitted)) - \(weekEnd.formatted(date: .abbreviated, time: .omitted))"
                                                                     let cal = Calendar.current
                                                                     let start = cal.startOfDay(for: weekStart)
-                                                                    let end = cal.startOfDay(for: weekEnd)
-                                                                    let daysCount = Set(trainings
-                                                                        .filter { $0.date >= start && $0.date <= end }
-                                                                        .map { cal.startOfDay(for: $0.date) }).count
+                                                                    let end = cal.date(byAdding: .day, value: 7, to: start) ?? start
+                                                                    let trainingDays = trainings
+                                                                        .filter { $0.date >= start && $0.date < end }
+                                                                        .map { cal.startOfDay(for: $0.date) }
+                                                                    let runDays = runs
+                                                                        .filter { $0.startTime >= start && $0.startTime < end }
+                                                                        .map { cal.startOfDay(for: $0.startTime) }
+                                                                    let daysCount = Set(trainingDays + runDays).count
                                                                     let subtitle = "Training days: \(daysCount)"
                                                                     let x = labelWidth + CGFloat(w) * (columnWidth + spacing)
                                                                     let y: CGFloat = 0
@@ -604,6 +625,67 @@ private struct TooltipView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color(.separator), lineWidth: 0.5)
         )
+    }
+}
+
+private extension TrainingTrendsView {
+    @ChartContentBuilder
+    private func barContent(indexedPeriods: [IndexedPeriod], shouldShowFocusMix: Bool, activityPoints: [ActivityPoint]) -> some ChartContent {
+        if shouldShowFocusMix {
+            ForEach(activityPoints, id: \.id) { point in
+                BarMark(
+                    x: .value("Week", Double(point.index)),
+                    y: .value("Count", point.count)
+                )
+                .position(by: .value("Type", point.category.rawValue))
+                .foregroundStyle(by: .value("Type", point.category.rawValue))
+            }
+        } else {
+            ForEach(indexedPeriods, id: \.index) { item in
+                BarMark(
+                    x: .value("Period", Double(item.index)),
+                    y: .value("Workouts", item.period.totalCount)
+                )
+                .foregroundStyle(Color.blue.opacity(0.7))
+            }
+        }
+    }
+    
+    @ChartContentBuilder
+    private func movingAverageContent(entries: [(index: Int, value: Double)]) -> some ChartContent {
+        ForEach(entries, id: \.index) { entry in
+            LineMark(
+                x: .value("Period", Double(entry.index)),
+                y: .value("MA", entry.value)
+            )
+            .foregroundStyle(Color.orange)
+            .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+            PointMark(
+                x: .value("Period", Double(entry.index)),
+                y: .value("MA", entry.value)
+            )
+            .foregroundStyle(Color.orange)
+            .symbolSize(32)
+        }
+    }
+    
+    private func periodLabel(for period: PeriodData, granularity: TrendsGranularity) -> String {
+        switch granularity {
+        case .weekly:
+            let initial = monthInitial(for: period.date)
+            let wom = Calendar.current.component(.weekOfMonth, from: period.date)
+            return "\(initial)\(wom)"
+        case .monthly:
+            return monthInitial(for: period.date)
+        }
+    }
+    
+    private func xDomain(for indexedPeriods: [IndexedPeriod]) -> ClosedRange<Double> {
+        guard let last = indexedPeriods.last else {
+            return -0.5...0.5
+        }
+        let upper = Double(last.index) + 0.5
+        return -0.5...upper
     }
 }
 

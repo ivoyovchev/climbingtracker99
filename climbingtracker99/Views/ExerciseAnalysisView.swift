@@ -159,6 +159,7 @@ private struct ExerciseParameterTrendsView: View {
                             x: .value("Date", point.date),
                             y: .value("Value", point.value)
                         )
+                        .symbolSize(32)
                     }
                 }
                 .frame(height: 220)

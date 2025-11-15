@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import MapKit
+import FirebaseFirestore
+import AVKit
 
 struct ActivityView: View {
     @Environment(\.modelContext) private var modelContext
@@ -63,59 +65,60 @@ struct ActivityView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Segment control
+        NavigationStack {
+            VStack {
                 Picker("", selection: $selectedSegment) {
                     ForEach(ActivitySegment.allCases, id: \.self) { segment in
-                        Text(segment.rawValue).tag(segment)
+                        Text(segment.rawValue)
                     }
                 }
                 .pickerStyle(.segmented)
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 12)
                 
-                // Activity list
-                if filteredActivities.isEmpty {
+                let activities = filteredActivities
+                if activities.isEmpty {
+                    Spacer()
                     EmptyActivityView(segment: selectedSegment)
+                        .padding(.horizontal)
+                    Spacer()
                 } else {
-                    List {
-                        ForEach(filteredActivities) { item in
-                            Group {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(activities) { item in
                                 switch item {
                                 case .training(let training):
                                     TrainingActivityCard(training: training)
-                                        .contentShape(Rectangle())
+                                        .padding(.horizontal, 16)
                                         .onTapGesture {
                                             selectedTraining = training
                                         }
-                                    
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                deleteTraining(training)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
                                 case .running(let run):
-                                    CompactRunningCard(run: run)
-                                        .contentShape(Rectangle())
+                                    RunningActivityCard(run: run)
+                                        .padding(.horizontal, 16)
                                         .onTapGesture {
                                             selectedRun = run
                                         }
-                                }
-                            }
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    switch item {
-                                    case .training(let training):
-                                        deleteTraining(training)
-                                    case .running(let run):
-                                        deleteRun(run)
-                                    }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                deleteRun(run)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
                                 }
                             }
                         }
+                        .padding(.vertical, 16)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
+                    .background(Color(.systemGroupedBackground))
                 }
             }
             .navigationTitle("Activity")
@@ -186,78 +189,148 @@ struct EmptyActivityView: View {
 
 struct TrainingActivityCard: View {
     let training: Training
+    var author: FirebaseActivityItem? = nil
+    
+    private var exerciseCount: Int { training.recordedExercises.count }
+    private var focusLabel: String { training.focus.rawValue.uppercased() }
+    private var isRecordedLabel: String { training.isRecorded ? "Recorded" : "Logged" }
+    private var focusColor: Color { training.focus.color }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header with date and focus
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(training.date, style: .date)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text(training.date, style: .time)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            // Author header (if present)
+            if let author {
+                authorHeader(for: author)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .background(Color(.systemBackground))
                 }
                 
+            // Header with date
+                    HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                        Text(training.date, style: .date)
+                        .font(.system(size: 16, weight: .semibold))
+                        Text(training.date, style: .time)
+                        .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                    }
+                    
                 Spacer()
                 
-                // Focus badge
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(training.focus.color)
-                        .frame(width: 8, height: 8)
-                    Text(training.focus.rawValue)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(training.focus.color)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(training.focus.color.opacity(0.15))
-                .cornerRadius(12)
+                Image(systemName: "figure.climbing")
+                    .font(.title2)
+                    .foregroundColor(focusColor)
             }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color(.systemBackground))
             
-            // Exercise summary
-            if !training.recordedExercises.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Exercises")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+            // Main stats row (Strava-style)
+            HStack(spacing: 0) {
+                // Duration - Largest
+                VStack(spacing: 4) {
+                            Text("\(training.duration)")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.primary)
+                            Text("min")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                .frame(maxWidth: .infinity)
+                        
+                Divider()
+                    .frame(height: 40)
+                        
+                // Exercise count
+                VStack(spacing: 4) {
+                            Text("\(max(exerciseCount, 0))")
+                        .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.primary)
+                            Text(exerciseCount == 1 ? "exercise" : "exercises")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                .frame(maxWidth: .infinity)
+                        
+                Divider()
+                    .frame(height: 40)
+                        
+                // Focus
+                VStack(spacing: 4) {
+                            Text(focusLabel)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text("focus")
+                        .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                .frame(maxWidth: .infinity)
+                    }
+            .padding(.vertical, 12)
+            .background(Color(.systemBackground))
                     
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(training.recordedExercises.prefix(5)) { exercise in
-                                ExerciseMiniCard(exercise: exercise)
-                            }
+            // Secondary stats
+            HStack(spacing: 20) {
+                        StatBadge(icon: training.location == .indoor ? "building.2" : "tree",
+                                  value: training.location.rawValue,
+                                  unit: "")
+                        StatBadge(icon: "dot.radiowaves.left.and.right",
+                                  value: isRecordedLabel,
+                                  unit: "")
+                        if !training.media.isEmpty {
+                            StatBadge(icon: "photo.fill", value: "\(training.media.count)", unit: "")
                         }
                     }
-                }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+                    
+            // Notes (if available)
+                    if !training.notes.isEmpty {
+                        Text(training.notes)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    .padding(.horizontal)
+                    .padding(.bottom, training.media.isEmpty ? 8 : 0)
             }
-            
-            // Stats row
-            HStack(spacing: 16) {
-                StatBadge(icon: "clock", value: "\(training.duration)", unit: "min")
-                StatBadge(icon: training.location == .indoor ? "building.2" : "tree", value: training.location.rawValue, unit: "")
-                if !training.media.isEmpty {
-                    StatBadge(icon: "photo.fill", value: "\(training.media.count)", unit: "")
+
+            // Media gallery
+            if !training.media.isEmpty {
+                if let remoteItems = RemoteMediaItem.items(from: training.media), !remoteItems.isEmpty {
+                    RemoteMediaGallery(items: remoteItems)
+                        .padding(8)
+                } else {
+                    TrainingMediaGallery(media: training.media)
+                        .padding(8)
                 }
-            }
-            
-            // Notes preview
-            if !training.notes.isEmpty {
-                Text(training.notes)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
             }
         }
-        .padding()
         .background(Color(.systemBackground))
         .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(focusColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
+    private func authorHeader(for author: FirebaseActivityItem) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            ProfileAvatarView(imageData: author.profileImageData, displayName: author.displayName)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(author.displayName)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                if !author.username.isEmpty {
+                    Text("@\(author.username)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 }
 
@@ -285,7 +358,7 @@ struct RunningActivityCard: View {
                     .foregroundColor(.green)
             }
             .padding(.horizontal)
-            .padding(.vertical, 12)
+            .padding(.vertical, 8)
             .background(Color(.systemBackground))
             
             // Main stats row (Strava-style)
@@ -329,7 +402,7 @@ struct RunningActivityCard: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .padding(.vertical, 16)
+            .padding(.vertical, 12)
             .background(Color(.systemBackground))
             
             // Secondary stats
@@ -345,13 +418,24 @@ struct RunningActivityCard: View {
                 }
             }
             .padding(.horizontal)
-            .padding(.bottom, 12)
+            .padding(.bottom, 8)
             
             // Route preview (if available)
             if !run.routeCoordinates.isEmpty {
                 RoutePreview(coordinates: run.routeCoordinates)
                     .frame(height: 120)
                     .cornerRadius(0)
+            }
+            
+            // Media gallery
+            if !run.media.isEmpty {
+                if let remoteItems = RemoteMediaItem.items(from: run.media), !remoteItems.isEmpty {
+                    RemoteMediaGallery(items: remoteItems)
+                        .padding(8)
+                } else {
+                    TrainingMediaGallery(media: run.media)
+                        .padding(8)
+                }
             }
         }
         .background(Color(.systemBackground))
@@ -380,111 +464,127 @@ struct RunningActivityCard: View {
 
 struct CompactRunningCard: View {
     let run: RunningSession
+    var author: FirebaseActivityItem? = nil
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Run icon
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.15))
-                    .frame(width: 50, height: 50)
-                
-                Image(systemName: "figure.run")
-                    .font(.title3)
-                    .foregroundColor(.green)
+        VStack(alignment: .leading, spacing: 12) {
+            if let author {
+                authorHeader(for: author)
             }
-            
-            // Main content
-            VStack(alignment: .leading, spacing: 6) {
-                // Date and time
-                HStack {
-                    Text(run.startTime, style: .date)
-                        .font(.headline)
-                    Spacer()
-                    Text(run.startTime, style: .time)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 50, height: 50)
+                    Image(systemName: "figure.run")
+                        .font(.title3)
+                        .foregroundColor(.green)
                 }
                 
-                // Stats row - compact
-                HStack(spacing: 16) {
-                    // Distance
-                    HStack(spacing: 4) {
-                        Text(String(format: "%.2f", run.distanceInKm))
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                        Text("km")
-                            .font(.caption)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(run.startTime, style: .date)
+                            .font(.headline)
+                        Spacer()
+                        Text(run.startTime, style: .time)
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                     
-                    Divider()
-                        .frame(height: 20)
-                    
-                    // Duration
-                    HStack(spacing: 4) {
-                        Text(formatTime(run.duration))
-                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                        Text("time")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Divider()
-                        .frame(height: 20)
-                    
-                    // Pace
-                    HStack(spacing: 4) {
-                        Text(run.formattedPace)
-                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                        Text("pace")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Secondary stats (if available)
-                if run.calories > 0 || run.elevationGain > 0 {
-                    HStack(spacing: 12) {
-                        if run.calories > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "flame.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.red)
-                                Text("\(run.calories) kcal")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Text(String(format: "%.2f", run.distanceInKm))
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                            Text("km")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                         
-                        if run.elevationGain > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.up")
-                                    .font(.caption2)
-                                    .foregroundColor(.green)
-                                Text(String(format: "%.0f m", run.elevationGain))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                        Divider().frame(height: 20)
+                        
+                        HStack(spacing: 4) {
+                            Text(formatTime(run.duration))
+                                .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            Text("time")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Divider().frame(height: 20)
+                        
+                        HStack(spacing: 4) {
+                            Text(run.formattedPace)
+                                .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            Text("pace")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if run.calories > 0 || run.elevationGain > 0 {
+                        HStack(spacing: 12) {
+                            if run.calories > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "flame.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                    Text("\(run.calories) kcal")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            if run.elevationGain > 0 {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.up")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                    Text(String(format: "%.0f m", run.elevationGain))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
+                    
                 }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
-            Spacer()
-            
-            // Chevron
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            if !run.media.isEmpty {
+                if let remoteItems = RemoteMediaItem.items(from: run.media), !remoteItems.isEmpty {
+                    RemoteMediaGallery(items: remoteItems)
+                } else {
+                    TrainingMediaGallery(media: run.media)
+                }
+            }
         }
         .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.green.opacity(0.2), lineWidth: 1)
-        )
+        .background(.ultraThinMaterial)
+        .cornerRadius(20)
+        .shadow(color: Color.green.opacity(0.15), radius: 12, x: 0, y: 6)
+    }
+    
+    private func authorHeader(for author: FirebaseActivityItem) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            ProfileAvatarView(imageData: author.profileImageData, displayName: author.displayName)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(author.displayName)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                if !author.username.isEmpty {
+                    Text("@\(author.username)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
     
     private func formatTime(_ duration: TimeInterval) -> String {
@@ -606,6 +706,259 @@ struct RoutePreview: View {
             }
         }
         .mapStyle(.standard(elevation: .realistic))
+    }
+}
+
+struct TrainingMediaGallery: View {
+    let media: [Media]
+    @State private var selectedMedia: Media?
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        if media.isEmpty {
+            EmptyView()
+        } else {
+            TabView {
+                ForEach(Array(media.enumerated()), id: \.element.id) { index, item in
+                    ZStack {
+                        TrainingMediaContent(media: item)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(Color.black.opacity(item.type == .video ? 0.15 : 0.05))
+                            .overlay(alignment: .center) {
+                                if item.type == .video {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.system(size: 48))
+                                        .foregroundColor(.white)
+                                        .shadow(radius: 8)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedMedia = item
+                            }
+                            .overlay(alignment: .bottomTrailing) {
+                                Text("\(index + 1)/\(media.count)")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .padding(12)
+                            }
+                            .overlay(alignment: .topLeading) {
+                                // Upload status indicator
+                                uploadStatusBadge(for: item)
+                                    .padding(12)
+                            }
+                    }
+                }
+            }
+            .frame(height: 240)
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.35)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .allowsHitTesting(false)
+            )
+            .padding(.top, 8)
+            .sheet(item: $selectedMedia) { media in
+                if let remoteItem = RemoteMediaItem(media: media) {
+                    RemoteMediaViewer(item: remoteItem)
+                } else {
+                    MediaFullView(media: media)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func uploadStatusBadge(for media: Media) -> some View {
+        switch media.uploadStateEnum {
+        case .uploading:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .tint(.white)
+                if let progress = media.uploadProgress {
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(6)
+            .background(Color.blue.opacity(0.85))
+            .clipShape(Capsule())
+        case .uploaded:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundColor(.white)
+                .padding(6)
+                .background(Color.green.opacity(0.85))
+                .clipShape(Circle())
+        case .failed:
+            Button {
+                Task {
+                    await FirebaseSyncManager.shared.retryMediaUpload(media: media, context: modelContext)
+                }
+            } label: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white)
+                    .padding(6)
+                    .background(Color.red.opacity(0.85))
+                    .clipShape(Circle())
+            }
+        case .pending:
+            if !media.isUploaded {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white)
+                    .padding(6)
+                    .background(Color.orange.opacity(0.85))
+                    .clipShape(Circle())
+            }
+        }
+    }
+}
+
+private extension RemoteMediaItem {
+    init?(media: Media) {
+        guard let remote = media.remoteURL else { return nil }
+        
+        self.id = media.id.uuidString
+        self.type = media.type
+        
+        // Check if it's base64 or URL
+        if remote.hasPrefix("base64:") {
+            let base64String = String(remote.dropFirst(7))
+            self.base64 = base64String
+            self.url = nil
+        } else if let url = URL(string: remote) {
+        self.url = url
+            self.base64 = nil
+        } else {
+            return nil
+        }
+        
+        // Handle thumbnail
+        if let thumbString = media.remoteThumbnailURL {
+            if thumbString.hasPrefix("base64:") {
+                self.thumbnailBase64 = String(thumbString.dropFirst(7))
+                self.thumbnailURL = nil
+            } else if let thumbURL = URL(string: thumbString) {
+            self.thumbnailURL = thumbURL
+                self.thumbnailBase64 = nil
+        } else {
+            self.thumbnailURL = nil
+                self.thumbnailBase64 = nil
+            }
+        } else {
+            self.thumbnailURL = nil
+            self.thumbnailBase64 = nil
+        }
+    }
+    
+    static func items(from media: [Media]) -> [RemoteMediaItem]? {
+        let converted = media.compactMap { RemoteMediaItem(media: $0) }
+        return converted.isEmpty ? nil : converted
+    }
+}
+
+private struct TrainingMediaContent: View {
+    let media: Media
+    
+    var body: some View {
+        Group {
+            if let image = media.image {
+                image
+                    .resizable()
+                    .scaledToFill()
+            } else if let thumbnail = media.thumbnail {
+                thumbnail
+                    .resizable()
+                    .scaledToFill()
+            } else if let remote = media.remoteURL {
+                // Check for base64 first
+                if remote.hasPrefix("base64:") {
+                    let base64String = String(remote.dropFirst(7))
+                    if let data = Data(base64Encoded: base64String), let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        placeholder
+                    }
+                } else if let remoteThumb = media.remoteThumbnailURL {
+                    // Check thumbnail for base64
+                    if remoteThumb.hasPrefix("base64:") {
+                        let base64String = String(remoteThumb.dropFirst(7))
+                        if let data = Data(base64Encoded: base64String), let uiImage = UIImage(data: data) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            placeholder
+                        }
+                    } else if let url = URL(string: remoteThumb) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholder
+                    case .empty:
+                        ZStack {
+                            Color.gray.opacity(0.1)
+                            ProgressView()
+                        }
+                    @unknown default:
+                        placeholder
+                    }
+                }
+                    } else {
+                        placeholder
+                    }
+                } else if let url = URL(string: remote) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholder
+                    case .empty:
+                        ZStack {
+                            Color.gray.opacity(0.1)
+                            ProgressView()
+                        }
+                    @unknown default:
+                        placeholder
+                    }
+                    }
+                } else {
+                    placeholder
+                }
+            } else {
+                placeholder
+            }
+        }
+    }
+    
+    private var placeholder: some View {
+        ZStack {
+            Color.gray.opacity(0.2)
+            Image(systemName: media.type == .video ? "video.fill" : "photo")
+                .font(.system(size: 28))
+                .foregroundColor(.white.opacity(0.9))
+        }
     }
 }
 

@@ -5,6 +5,7 @@ import CoreLocation
 @Model
 final class RunningSession {
     var id: UUID
+    var syncIdentifier: String?
     var startTime: Date
     var endTime: Date?
     var duration: TimeInterval // in seconds
@@ -16,6 +17,7 @@ final class RunningSession {
     var maxSpeed: Double // m/s
     var averageSpeed: Double // m/s
     var notes: String
+    var media: [Media]
     
     // Route data stored as JSON string
     @Attribute(.externalStorage) var routeDataJSON: Data?
@@ -34,8 +36,11 @@ final class RunningSession {
          elevationLoss: Double = 0,
          maxSpeed: Double = 0,
          averageSpeed: Double = 0,
-         notes: String = "") {
+         notes: String = "",
+         media: [Media] = [],
+         syncIdentifier: String? = nil) {
         self.id = id
+        self.syncIdentifier = syncIdentifier ?? id.uuidString
         self.startTime = startTime
         self.endTime = endTime
         self.duration = duration
@@ -47,6 +52,7 @@ final class RunningSession {
         self.maxSpeed = maxSpeed
         self.averageSpeed = averageSpeed
         self.notes = notes
+        self.media = media
     }
     
     // Computed properties

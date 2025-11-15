@@ -3,6 +3,18 @@ import SwiftData
 import SwiftUI
 import AVKit
 
+enum MediaType: String, Codable, CaseIterable {
+    case image
+    case video
+}
+
+enum UploadState: String, Codable {
+    case pending
+    case uploading
+    case uploaded
+    case failed
+}
+
 @Model
 final class Media: Identifiable {
     var id: UUID
@@ -12,6 +24,15 @@ final class Media: Identifiable {
     @Attribute(.externalStorage) var thumbnailData: Data?
     var date: Date
     var training: Training?
+    var runningSession: RunningSession?
+    var remoteURL: String?
+    var remoteThumbnailURL: String?
+    var storagePath: String?
+    var thumbnailStoragePath: String?
+    var isRouteSnapshot: Bool
+    var uploadState: String // UploadState rawValue for SwiftData compatibility
+    var uploadError: String?
+    var uploadProgress: Double?
     
     init(type: MediaType, imageData: Data? = nil, videoData: Data? = nil, thumbnailData: Data? = nil) {
         self.id = UUID()
@@ -20,6 +41,14 @@ final class Media: Identifiable {
         self.videoData = videoData
         self.thumbnailData = thumbnailData
         self.date = Date()
+        self.remoteURL = nil
+        self.remoteThumbnailURL = nil
+        self.storagePath = nil
+        self.thumbnailStoragePath = nil
+        self.isRouteSnapshot = false
+        self.uploadState = UploadState.pending.rawValue
+        self.uploadError = nil
+        self.uploadProgress = nil
     }
     
     var image: Image? {
@@ -79,9 +108,26 @@ final class Media: Identifiable {
             }
         }
     }
-}
-
-enum MediaType: String, Codable, CaseIterable {
-    case image
-    case video
+    
+    // Convenience computed properties for upload state
+    var uploadStateEnum: UploadState {
+        get {
+            UploadState(rawValue: uploadState) ?? .pending
+        }
+        set {
+            uploadState = newValue.rawValue
+        }
+    }
+    
+    var isUploaded: Bool {
+        uploadStateEnum == .uploaded || remoteURL != nil
+    }
+    
+    var isUploading: Bool {
+        uploadStateEnum == .uploading
+    }
+    
+    var hasUploadFailed: Bool {
+        uploadStateEnum == .failed
+    }
 } 

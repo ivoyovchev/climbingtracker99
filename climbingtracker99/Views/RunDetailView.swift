@@ -1,13 +1,19 @@
 import SwiftUI
 import SwiftData
 import MapKit
+import PhotosUI
 
 struct RunDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     let run: RunningSession
     
     @State private var cameraPosition: MapCameraPosition
     @State private var showingSplits = false
+    @State private var selectedImageItems: [PhotosPickerItem] = []
+    @State private var selectedVideoItem: PhotosPickerItem?
+    @State private var isProcessingMedia = false
+    @State private var showingDeleteConfirmation = false
     
     init(run: RunningSession) {
         self.run = run
@@ -149,6 +155,12 @@ struct RunDetailView: View {
                             }
                         }
                         .background(Color(.secondarySystemBackground))
+                        
+                        Divider()
+                            .padding(.top, 12)
+                        
+                        mediaSection
+                            .padding(.top, 16)
                     }
                     
                     // Splits section
@@ -235,7 +247,54 @@ struct RunDetailView: View {
                         dismiss()
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                }
             }
+            .onChange(of: selectedImageItems) { oldValue, newValue in
+                guard !newValue.isEmpty else { return }
+                Task {
+                    await setProcessing(true)
+                    for item in newValue {
+                        await handleMediaSelection(item, type: .image)
+                    }
+                    await MainActor.run {
+                        selectedImageItems.removeAll()
+                    }
+                    await setProcessing(false)
+                    FirebaseSyncManager.shared.triggerFullSync()
+                }
+            }
+            .onChange(of: selectedVideoItem) { oldValue, newValue in
+                guard let item = newValue else { return }
+                Task {
+                    await setProcessing(true)
+                    await handleMediaSelection(item, type: .video)
+                    await MainActor.run {
+                        selectedVideoItem = nil
+                    }
+                    await setProcessing(false)
+                    FirebaseSyncManager.shared.triggerFullSync()
+                }
+            }
+        }
+        .alert("Delete Run?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(run)
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("Failed to delete run: \(error.localizedDescription)")
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will remove the run and its media from your history.")
         }
     }
     
@@ -248,6 +307,133 @@ struct RunDetailView: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%d:%02d", minutes, seconds)
+        }
+    }
+}
+
+// MARK: - Media Management
+
+extension RunDetailView {
+    @ViewBuilder
+    fileprivate var mediaSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Media")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                if isProcessingMedia {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+            
+            if run.media.isEmpty {
+                Text("Add photos or videos to capture highlights from this run.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(run.media) { media in
+                            MediaCard(media: media) {
+                                removeMedia(media)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            
+            HStack(spacing: 16) {
+                PhotosPicker(selection: $selectedImageItems, matching: .images) {
+                    mediaAddButton(icon: "photo.on.rectangle.angled", title: "Add Photos")
+                }
+                PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
+                    mediaAddButton(icon: "video.fill", title: "Add Video")
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    private func mediaAddButton(icon: String, title: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+            Text(title)
+                .font(.caption)
+        }
+        .frame(width: 70, height: 70)
+        .background(Color.blue.opacity(0.12))
+        .foregroundColor(.blue)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+    
+    private func setProcessing(_ value: Bool) async {
+        await MainActor.run {
+            isProcessingMedia = value
+        }
+    }
+    
+    private func handleMediaSelection(_ item: PhotosPickerItem, type: MediaType) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            var newMedia: Media
+            if type == .video {
+                newMedia = Media(type: .video, videoData: data)
+                if let thumb = try await newMedia.generateThumbnail() {
+                    newMedia.thumbnailData = thumb
+                }
+            } else {
+                newMedia = Media(type: .image, imageData: data)
+            }
+            await MainActor.run {
+                appendMedia(newMedia)
+            }
+        } catch {
+            print("Error handling media selection: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func appendMedia(_ media: Media) {
+        media.runningSession = run
+        if !run.media.contains(where: { $0.id == media.id }) {
+            run.media.append(media)
+        }
+        modelContext.insert(media)
+        do {
+            try modelContext.save()
+            // Upload immediately to Firebase
+            Task {
+                await FirebaseSyncManager.shared.uploadMediaImmediately(media: media, context: modelContext)
+            }
+            // Also trigger full sync to update activity feed
+            FirebaseSyncManager.shared.triggerFullSync()
+        } catch {
+            print("Error saving media: \(error.localizedDescription)")
+        }
+    }
+    
+    @MainActor
+    private func removeMedia(_ media: Media) {
+        if let index = run.media.firstIndex(where: { $0.id == media.id }) {
+            run.media.remove(at: index)
+        }
+        modelContext.delete(media)
+        Task {
+            await FirebaseSyncManager.shared.deleteRemoteMediaIfNeeded(media: media)
+        }
+        do {
+            try modelContext.save()
+            FirebaseSyncManager.shared.triggerFullSync()
+        } catch {
+            print("Error removing media: \(error.localizedDescription)")
         }
     }
 }

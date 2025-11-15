@@ -8,7 +8,7 @@ struct NutritionView: View {
     @State private var selectedEntry: NutritionEntry?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 TabHeaderView(title: "Nutrition") {
                     Button(action: { showingAddEntry = true }) {
@@ -100,7 +100,7 @@ struct NutritionEntryEditView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Date")) {
                     DatePicker("Date", selection: $date, displayedComponents: .date)

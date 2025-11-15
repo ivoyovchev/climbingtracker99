@@ -565,6 +565,7 @@ struct ExerciseFormView: View {
         Group {
             Section(header: Text("Grade")) {
                 Picker("Grade", selection: gradeBinding) {
+                    Text("None").tag(nil as String?)
                     ForEach((1...17).reversed(), id: \.self) { grade in
                         Text("V\(grade)").tag("V\(grade)" as String?)
                     }
@@ -608,6 +609,7 @@ struct ExerciseFormView: View {
         Group {
             Section(header: Text("Grade")) {
                 Picker("Grade", selection: gradeBinding) {
+                    Text("None").tag(nil as String?)
                     ForEach((1...17).reversed(), id: \.self) { grade in
                         Text("V\(grade)").tag("V\(grade)" as String?)
                     }

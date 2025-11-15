@@ -95,19 +95,27 @@ struct GoalsRowView: View {
             return data
         }()
         
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 12)], spacing: 12) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                GoalCard(
-                    progress: item.0,
-                    title: item.1,
-                    subtitle: item.2,
-                    color: item.3,
-                    details: item.4,
-                    centerText: item.5
-                )
+        GeometryReader { geometry in
+            let availableWidth = geometry.size.width - 32 // Account for horizontal padding
+            let spacing: CGFloat = 2
+            let cardWidth = (availableWidth - (CGFloat(items.count - 1) * spacing)) / CGFloat(items.count)
+            
+            HStack(spacing: spacing) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    GoalCard(
+                        progress: item.0,
+                        title: item.1,
+                        subtitle: item.2,
+                        color: item.3,
+                        details: item.4,
+                        centerText: item.5
+                    )
+                    .frame(width: cardWidth)
+                }
             }
+            .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: 120)
         .padding(.horizontal)
     }
     
@@ -169,50 +177,48 @@ struct GoalCard: View {
     let centerText: String? // Optional custom text for center (e.g., weight in kg)
     
     var body: some View {
-        VStack(alignment: .center, spacing: 8) {
+        VStack(alignment: .center, spacing: 4) {
             ZStack {
                 Circle()
-                    .stroke(color.opacity(0.15), lineWidth: 8)
-                    .frame(width: 64, height: 64)
+                    .stroke(color.opacity(0.15), lineWidth: 6)
+                    .frame(width: 65, height: 65)
                 Circle()
                     .trim(from: 0, to: max(0, min(1, progress)))
-                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .frame(width: 64, height: 64)
+                    .stroke(color, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .frame(width: 65, height: 65)
                     .rotationEffect(.degrees(-90))
                 if let centerText = centerText {
                     VStack(spacing: 0) {
                         Text(centerText)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundColor(color)
                         Text("kg")
-                            .font(.system(size: 8, weight: .semibold))
+                            .font(.system(size: 6, weight: .semibold))
                             .foregroundColor(color.opacity(0.7))
                     }
                 } else {
                     Text(String(format: "%.0f%%", max(0, min(1, progress)) * 100))
-                        .font(.subheadline)
-                        .bold()
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(color)
                 }
             }
             
-            VStack(alignment: .center, spacing: 2) {
+            VStack(alignment: .center, spacing: 1) {
                 Text(title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.center)
+                    .lineLimit(1)
                 Text(details)
-                    .font(.caption2)
+                    .font(.system(size: 7))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
             }
-            .frame(maxWidth: .infinity)
         }
-        .padding(12)
+        .padding(6)
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
-        .cornerRadius(12)
+        .cornerRadius(8)
     }
 } 

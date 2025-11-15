@@ -221,6 +221,7 @@ final class RecordedExercise: ObservableObject {
 
 @Model
 final class Training {
+    var syncIdentifier: String?
     var date: Date
     var duration: Int // in minutes
     var location: TrainingLocation
@@ -235,10 +236,11 @@ final class Training {
     var recordingEndTime: Date?
     var totalRecordedDuration: Int? // in seconds
     
-    init(date: Date = Date(), duration: Int = 60, location: TrainingLocation = .indoor, 
-         focus: TrainingFocus = .strength, recordedExercises: [RecordedExercise] = [], 
+    init(date: Date = Date(), duration: Int = 60, location: TrainingLocation = .indoor,
+         focus: TrainingFocus = .strength, recordedExercises: [RecordedExercise] = [],
          notes: String = "", media: [Media] = [], isRecorded: Bool = false,
-         recordingStartTime: Date? = nil) {
+         recordingStartTime: Date? = nil, syncIdentifier: String? = nil) {
+        self.syncIdentifier = syncIdentifier ?? UUID().uuidString
         self.date = date
         self.duration = duration
         self.location = location

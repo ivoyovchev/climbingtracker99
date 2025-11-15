@@ -1,9 +1,18 @@
 import SwiftUI
 import SwiftData
 import AVKit
+import PhotosUI
 
 struct TrainingDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @State private var showingExerciseManager = false
+    @State private var showingContinueSession = false
+    @State private var continueSnapshot: ActiveRecordingSnapshot?
+    @State private var selectedImageItems: [PhotosPickerItem] = []
+    @State private var selectedVideoItem: PhotosPickerItem?
+    @State private var isProcessingMedia = false
+    @State private var showingDeleteConfirmation = false
     let training: Training
     
     var body: some View {
@@ -56,6 +65,30 @@ struct TrainingDetailView: View {
                     .background(Color(.systemBackground))
                     .cornerRadius(16)
                     
+                    if training.isRecorded {
+                        Button(action: {
+                            if let snapshot = RecordingManager.shared.snapshot {
+                                continueSnapshot = snapshot
+                                RecordingManager.shared.snapshot = nil
+                            } else {
+                                continueSnapshot = nil
+                            }
+                            showingContinueSession = true
+                        }) {
+                            HStack {
+                                Image(systemName: "play.circle.fill")
+                                Text("Continue Training")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
+                    }
+                    
                     // Exercises Summary
                     if !training.recordedExercises.isEmpty {
                         VStack(alignment: .leading, spacing: 16) {
@@ -70,24 +103,7 @@ struct TrainingDetailView: View {
                         }
                     }
                     
-                    // Media section
-                    if !training.media.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Media")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
-                            
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(training.media) { media in
-                                        MediaCard(media: media)
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
+                    mediaSection
                     
                     // Notes
                     if !training.notes.isEmpty {
@@ -109,16 +125,229 @@ struct TrainingDetailView: View {
                     }
                 }
                 .padding(.vertical)
+                .onChange(of: selectedImageItems) { _, newItems in
+                    handleSelectedImages(newItems)
+                }
+                .onChange(of: selectedVideoItem) { _, newItem in
+                    handleSelectedVideo(newItem)
+                }
             }
             .navigationTitle("Training Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        if let snapshot = RecordingManager.shared.snapshot {
+                            continueSnapshot = snapshot
+                            RecordingManager.shared.snapshot = nil
+                        } else {
+                            continueSnapshot = nil
+                        }
+                        showingContinueSession = true
+                    } label: {
+                        Image(systemName: "play.circle.fill")
+                    }
+                    Button {
+                        showingExerciseManager = true
+                    } label: {
+                        Label("Manage Exercises", systemImage: "square.and.pencil")
+                    }
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
                     Button("Done") {
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            print("Error saving training changes: \(error.localizedDescription)")
+                        }
                         dismiss()
                     }
                 }
             }
+            .sheet(isPresented: $showingExerciseManager) {
+                ManageTrainingExercisesView(training: training)
+            }
+            .sheet(isPresented: $showingContinueSession, onDismiss: {
+                continueSnapshot = nil
+            }) {
+                if let snapshot = continueSnapshot {
+                    RecordTrainingView(training: snapshot.training ?? training, snapshot: snapshot)
+                } else {
+                    RecordTrainingView(training: training)
+                }
+            }
+        }
+        .alert("Delete Training?", isPresented: $showingDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(training)
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("Failed to delete training: \(error.localizedDescription)")
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will remove the training and its media from your history.")
+        }
+    }
+}
+
+// MARK: - Media Management
+
+extension TrainingDetailView {
+    @ViewBuilder
+    private var mediaSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Media")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                if isProcessingMedia {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+
+            if training.media.isEmpty {
+                Text("No media yet. Add photos or videos to capture the session.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(training.media) { media in
+                            MediaCard(media: media) {
+                                removeMedia(media)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            HStack(spacing: 16) {
+                PhotosPicker(selection: $selectedImageItems, matching: .images) {
+                    mediaAddButton(icon: "photo.on.rectangle.angled", title: "Add Photos")
+                }
+                PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
+                    mediaAddButton(icon: "video.fill", title: "Add Video")
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+        .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func mediaAddButton(icon: String, title: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+            Text(title)
+                .font(.caption)
+        }
+        .frame(width: 70, height: 70)
+        .background(Color.blue.opacity(0.12))
+        .foregroundColor(.blue)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func handleSelectedImages(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        Task {
+            await setProcessing(true)
+            for item in items {
+                await handleMediaSelection(item, type: .image)
+            }
+            await MainActor.run {
+                selectedImageItems.removeAll()
+            }
+            await setProcessing(false)
+            FirebaseSyncManager.shared.triggerFullSync()
+        }
+    }
+
+    private func handleSelectedVideo(_ item: PhotosPickerItem?) {
+        guard let item else { return }
+        Task {
+            await setProcessing(true)
+            await handleMediaSelection(item, type: .video)
+            await MainActor.run {
+                selectedVideoItem = nil
+            }
+            await setProcessing(false)
+            FirebaseSyncManager.shared.triggerFullSync()
+        }
+    }
+
+    private func setProcessing(_ value: Bool) async {
+        await MainActor.run {
+            isProcessingMedia = value
+        }
+    }
+
+    private func handleMediaSelection(_ item: PhotosPickerItem, type: MediaType) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            var newMedia: Media
+            if type == .video {
+                newMedia = Media(type: .video, videoData: data)
+                if let thumb = try await newMedia.generateThumbnail() {
+                    newMedia.thumbnailData = thumb
+                }
+            } else {
+                newMedia = Media(type: .image, imageData: data)
+            }
+            await MainActor.run {
+                appendMedia(newMedia)
+            }
+        } catch {
+            print("Error handling media selection: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func appendMedia(_ media: Media) {
+        media.training = training
+        if !training.media.contains(where: { $0.id == media.id }) {
+            training.media.append(media)
+        }
+        modelContext.insert(media)
+        do {
+            try modelContext.save()
+            // Upload immediately to Firebase
+            Task {
+                await FirebaseSyncManager.shared.uploadMediaImmediately(media: media, context: modelContext)
+            }
+            // Also trigger full sync to update activity feed
+            FirebaseSyncManager.shared.triggerFullSync()
+        } catch {
+            print("Error saving media: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func removeMedia(_ media: Media) {
+        if let index = training.media.firstIndex(where: { $0.id == media.id }) {
+            training.media.remove(at: index)
+        }
+        modelContext.delete(media)
+        Task {
+            await FirebaseSyncManager.shared.deleteRemoteMediaIfNeeded(media: media)
+        }
+        do {
+            try modelContext.save()
+            FirebaseSyncManager.shared.triggerFullSync()
+        } catch {
+            print("Error removing media: \(error.localizedDescription)")
         }
     }
 }
@@ -164,7 +393,7 @@ struct ExerciseDetailCard: View {
                         .font(.headline)
                     
                     if let focus = exercise.exercise.focus {
-                        Text(focus.rawValue)
+                         Text(focus.rawValue)
                             .font(.caption)
                             .foregroundColor(focus.color)
                     }
@@ -181,6 +410,264 @@ struct ExerciseDetailCard: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Manage Exercises
+
+private struct ManageTrainingExercisesView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allExercises: [Exercise]
+    @Bindable var training: Training
+    @State private var editingExercise: RecordedExercise?
+    @State private var continuingExercise: RecordedExercise?
+    @State private var showingExerciseSelection = false
+    @State private var saveError: String?
+    
+    private var recordedExercises: [RecordedExercise] {
+        training.recordedExercises
+            .sorted { lhs, rhs in
+                lhs.exercise.type < rhs.exercise.type
+            }
+    }
+    
+    private var selectableExercises: [Exercise] {
+        allExercises.sorted { $0.type < $1.type }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                if let message = saveError {
+                    Section {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                if recordedExercises.isEmpty {
+                    Section {
+                        VStack(spacing: 8) {
+                            Image(systemName: "figure.climbing")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text("No recorded exercises yet.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("Tap + to add exercises to this training session.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                    }
+                } else {
+                    Section {
+                        ForEach(recordedExercises) { recorded in
+                            ManageRecordedExerciseRow(
+                                recordedExercise: recorded,
+                                onEdit: { editingExercise = recorded },
+                                onContinue: { beginContinuation(for: recorded) },
+                                onDelete: { deleteExercise(recorded) }
+                            )
+                            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                Button {
+                                    beginContinuation(for: recorded)
+                                } label: {
+                                    Label("Continue", systemImage: "play.circle")
+                                }
+                                .tint(.green)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    deleteExercise(recorded)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    editingExercise = recorded
+                                } label: {
+                                    Label("Edit", systemImage: "square.and.pencil")
+                                }
+                                .tint(.blue)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Manage Exercises")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { saveAndDismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    if !selectableExercises.isEmpty {
+                        Button {
+                            showingExerciseSelection = true
+                        } label: {
+                            Label("Add", systemImage: "plus")
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingExerciseSelection) {
+                ExerciseSelectionSheet(exercises: selectableExercises) { exercise in
+                    addExercise(exercise)
+                    showingExerciseSelection = false
+                }
+            }
+            .sheet(item: $editingExercise) { recorded in
+                RecordedExerciseEditView(recordedExercise: recorded)
+            }
+            .sheet(item: $continuingExercise) { recorded in
+                ContinueRecordedExerciseView(recordedExercise: recorded)
+            }
+        }
+        .onDisappear {
+            try? modelContext.save()
+        }
+    }
+    
+    private func saveAndDismiss() {
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            saveError = error.localizedDescription
+        }
+    }
+    
+    private func addExercise(_ exercise: Exercise) {
+        let recorded = RecordedExercise(exercise: exercise)
+        recorded.recordedStartTime = Date()
+        recorded.isCompleted = false
+        training.recordedExercises.append(recorded)
+        modelContext.insert(recorded)
+        beginContinuation(for: recorded)
+    }
+    
+    private func deleteExercise(_ recorded: RecordedExercise) {
+        if let index = training.recordedExercises.firstIndex(where: { $0.persistentModelID == recorded.persistentModelID }) {
+            training.recordedExercises.remove(at: index)
+        }
+        modelContext.delete(recorded)
+    }
+    
+    private func beginContinuation(for recorded: RecordedExercise) {
+        recorded.recordedStartTime = Date()
+        recorded.recordedEndTime = nil
+        recorded.pausedDuration = 0
+        recorded.isCompleted = false
+        continuingExercise = recorded
+    }
+}
+
+private struct ManageRecordedExerciseRow: View {
+    let recordedExercise: RecordedExercise
+    let onEdit: () -> Void
+    let onContinue: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(recordedExercise.exercise.type.imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 52, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(recordedExercise.exercise.type.displayName)
+                    .font(.headline)
+                if let duration = recordedExercise.recordedDuration {
+                    Text("Duration: \(formatDuration(duration))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                if let notes = recordedExercise.notes, !notes.isEmpty {
+                    Text(notes)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            Menu {
+                Button(action: onContinue) {
+                    Label("Continue", systemImage: "play.circle")
+                }
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "square.and.pencil")
+                }
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%d:%02d", minutes, secs)
+        }
+    }
+}
+
+private struct RecordedExerciseEditView: View {
+    @ObservedObject var recordedExercise: RecordedExercise
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            ExerciseFormView(
+                exercise: recordedExercise.exercise,
+                recordedExercise: recordedExercise,
+                isRecording: true
+            )
+            .navigationTitle("Edit Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ContinueRecordedExerciseView: View {
+    @ObservedObject var recordedExercise: RecordedExercise
+    @Environment(\.dismiss) private var dismiss
+    @State private var isPresented = true
+    
+    var body: some View {
+        NavigationStack {
+            ExerciseRecordView(recordedExercise: recordedExercise, isPresented: $isPresented)
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue {
+                finalizeContinuation()
+                dismiss()
+            }
+        }
+    }
+    
+    private func finalizeContinuation() {
+        recordedExercise.isCompleted = true
+        recordedExercise.recordedEndTime = Date()
     }
 }
 
@@ -912,7 +1399,9 @@ struct DetailRow: View {
 
 struct MediaCard: View {
     let media: Media
+    var onDelete: (() -> Void)? = nil
     @State private var showingFullMedia = false
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         Group {
@@ -935,8 +1424,99 @@ struct MediaCard: View {
                     )
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+                        .shadow(radius: 2)
+                        .padding(6)
+                        .background(Color.black.opacity(0.35))
+                        .clipShape(Circle())
+                }
+                .padding(6)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            // Upload status indicator
+            uploadStatusIndicator
+                .padding(6)
+        }
+        .contextMenu {
+            if let onDelete {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
+            if media.hasUploadFailed {
+                Button {
+                    Task {
+                        await FirebaseSyncManager.shared.retryMediaUpload(media: media, context: modelContext)
+                    }
+                } label: {
+                    Label("Retry Upload", systemImage: "arrow.clockwise")
+                }
+            }
+        }
         .sheet(isPresented: $showingFullMedia) {
             MediaFullView(media: media)
+        }
+    }
+    
+    @ViewBuilder
+    private var uploadStatusIndicator: some View {
+        switch media.uploadStateEnum {
+        case .uploading:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .tint(.white)
+                if let progress = media.uploadProgress {
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundColor(.white)
+                }
+            }
+            .padding(6)
+            .background(Color.blue.opacity(0.8))
+            .clipShape(Capsule())
+        case .uploaded:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+                .padding(6)
+                .background(Color.green.opacity(0.8))
+                .clipShape(Circle())
+        case .failed:
+            Button {
+                Task {
+                    await FirebaseSyncManager.shared.retryMediaUpload(media: media, context: modelContext)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                    Text("Retry")
+                        .font(.caption2)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.red.opacity(0.8))
+                .clipShape(Capsule())
+            }
+        case .pending:
+            if !media.isUploaded {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white)
+                    .padding(6)
+                    .background(Color.orange.opacity(0.8))
+                    .clipShape(Circle())
+            }
         }
     }
 }

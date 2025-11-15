@@ -20,7 +20,7 @@ struct PlanView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Calendar View
                 CalendarView(
@@ -628,8 +628,17 @@ struct CalendarView: View {
             
             // Weekday headers (Monday first)
             HStack(spacing: 0) {
-                ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { day in
-                    Text(day)
+                let weekdayLabels = [
+                    WeekdayLabel(symbol: "M", id: "weekday-1"),
+                    WeekdayLabel(symbol: "T", id: "weekday-2"),
+                    WeekdayLabel(symbol: "W", id: "weekday-3"),
+                    WeekdayLabel(symbol: "T", id: "weekday-4a"),
+                    WeekdayLabel(symbol: "F", id: "weekday-5"),
+                    WeekdayLabel(symbol: "S", id: "weekday-6"),
+                    WeekdayLabel(symbol: "S", id: "weekday-7")
+                ]
+                ForEach(weekdayLabels, id: \.id) { label in
+                    Text(label.symbol)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(.secondary)
@@ -645,7 +654,7 @@ struct CalendarView: View {
                         isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                         isToday: calendar.isDateInToday(date),
                         isCurrentMonth: calendar.isDate(date, equalTo: currentMonth, toGranularity: .month),
-                        hasPlans: hasPlansForDate(date)
+                        planColors: planColors(for: date)
                     ) {
                         selectedDate = date
                     }
@@ -676,24 +685,23 @@ struct CalendarView: View {
         return days
     }
     
-    private func hasPlansForDate(_ date: Date) -> Bool {
+    private func planColors(for date: Date) -> [Color] {
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-        
-        let hasTraining = plannedTrainings.contains { training in
-            training.date >= startOfDay && training.date < endOfDay
-        }
-        
-        let hasRun = plannedRuns.contains { run in
-            run.date >= startOfDay && run.date < endOfDay
-        }
-        
-        let hasBenchmark = plannedBenchmarks.contains { benchmark in
-            benchmark.date >= startOfDay && benchmark.date < endOfDay
-        }
-        
-        return hasTraining || hasRun || hasBenchmark
+        var colors: [Color] = []
+        let trainingsForDay = plannedTrainings.filter { $0.date >= startOfDay && $0.date < endOfDay }
+        colors.append(contentsOf: Array(repeating: Color.blue, count: trainingsForDay.count))
+        let runsForDay = plannedRuns.filter { $0.date >= startOfDay && $0.date < endOfDay }
+        colors.append(contentsOf: Array(repeating: Color.green, count: runsForDay.count))
+        let benchmarksForDay = plannedBenchmarks.filter { $0.date >= startOfDay && $0.date < endOfDay }
+        colors.append(contentsOf: Array(repeating: Color.orange, count: benchmarksForDay.count))
+        return colors
     }
+}
+
+private struct WeekdayLabel: Hashable {
+    let symbol: String
+    let id: String
 }
 
 struct DayView: View {
@@ -701,7 +709,7 @@ struct DayView: View {
     let isSelected: Bool
     let isToday: Bool
     let isCurrentMonth: Bool
-    let hasPlans: Bool
+    let planColors: [Color]
     let action: () -> Void
     
     private let calendar = Calendar.current
@@ -718,11 +726,14 @@ struct DayView: View {
                             .fill(isSelected ? Color.blue : (isToday ? Color.blue.opacity(0.2) : Color.clear))
                     )
                 
-                // Dot indicator for plans
-                if hasPlans {
-                    Circle()
-                        .fill(isSelected ? Color.white : Color.blue)
-                        .frame(width: 4, height: 4)
+                if !planColors.isEmpty {
+                    HStack(spacing: 2) {
+                        ForEach(Array(planColors.enumerated()), id: \.offset) { _, color in
+                            Circle()
+                                .fill(color)
+                                .frame(width: 4, height: 4)
+                        }
+                    }
                 } else {
                     Circle()
                         .fill(Color.clear)

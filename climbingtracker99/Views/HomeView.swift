@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import WidgetKit
 import Charts
+import UIKit
 
 enum TimeRange: String, CaseIterable {
     case week = "Week"
@@ -81,6 +82,7 @@ struct HomeView: View {
     @Query(sort: \PlannedTraining.date) private var plannedTrainings: [PlannedTraining]
     @Query(sort: \PlannedRun.date) private var plannedRuns: [PlannedRun]
     @Query private var goals: [Goals]
+    @State private var userSettings: [UserSettings] = []
     
     @State private var showingGoalsSheet = false
     @State private var animateStats = false
@@ -89,6 +91,8 @@ struct HomeView: View {
     @State private var showingRecordTraining = false
     @State private var showingLogTraining = false
     @State private var showingStartRun = false
+    @State private var showingProfile = false
+    @State private var activeRecordingSnapshot: ActiveRecordingSnapshot?
     
     private var currentWeight: Double? {
         weightEntries.first?.weight
@@ -323,7 +327,15 @@ struct HomeView: View {
                         endPoint: .bottomTrailing
                     ),
                     iconColor: .white,
-                    action: { showingRecordTraining = true }
+                    action: {
+                        if let snapshot = RecordingManager.shared.snapshot {
+                            activeRecordingSnapshot = snapshot
+                            RecordingManager.shared.snapshot = nil
+                        } else {
+                            activeRecordingSnapshot = nil
+                        }
+                        showingRecordTraining = true
+                    }
                 )
                 
                 // Log Training Button (Deep Blue)
@@ -356,8 +368,52 @@ struct HomeView: View {
         }
     }
     
+    private var profileSettings: UserSettings? {
+        userSettings.first
+    }
+    
+    private func loadUserSettings() {
+        let descriptor = FetchDescriptor<UserSettings>()
+        if let fetched = try? modelContext.fetch(descriptor) {
+            if fetched.isEmpty {
+                let newSettings = UserSettings()
+                modelContext.insert(newSettings)
+                userSettings = [newSettings]
+            } else {
+                userSettings = fetched
+            }
+        }
+    }
+    
+    private var headerSection: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Dashboard")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                if let settings = profileSettings {
+                    let name = settings.userName
+                    if !name.isEmpty {
+                        let firstName = name.split(separator: " ").first.map(String.init) ?? name
+                        Text("Welcome back, \(firstName)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            Spacer()
+            Button {
+                showingProfile = true
+            } label: {
+                ProfileAvatarView(imageData: profileSettings?.profileImageData, displayName: profileSettings?.userName ?? "")
+            }
+        }
+        .padding(.horizontal)
+    }
+
     private var mainContent: some View {
         VStack(spacing: 20) {
+            headerSection
             trainingActionsSection
             
             // Next Activity Section
@@ -367,7 +423,7 @@ struct HomeView: View {
             
             GoalsSectionView(goals: userGoals, trainingProgress: trainingProgress, runsThisWeek: runsThisWeek, distanceThisWeek: distanceThisWeek, currentWeight: currentWeight, showingGoalsSheet: $showingGoalsSheet)
                 .frame(maxWidth: .infinity, alignment: .center)
-            TrainingTrendsView(trainings: trainings, weeklyTarget: userGoals.targetTrainingsPerWeek)
+            TrainingTrendsView(trainings: trainings, runs: runningSessions, weeklyTarget: userGoals.targetTrainingsPerWeek)
             
             UpcomingBenchmarksView(benchmarks: plannedBenchmarks)
             
@@ -387,11 +443,24 @@ struct HomeView: View {
         .sheet(isPresented: $showingLogTraining) {
             TrainingEditView()
         }
-        .fullScreenCover(isPresented: $showingRecordTraining) {
-            RecordTrainingView()
+        .fullScreenCover(isPresented: $showingRecordTraining, onDismiss: {
+            activeRecordingSnapshot = nil
+        }) {
+            if let snapshot = activeRecordingSnapshot {
+                RecordTrainingView(training: snapshot.training, snapshot: snapshot)
+            } else {
+                RecordTrainingView()
+            }
         }
         .fullScreenCover(isPresented: $showingStartRun) {
             RunningView()
+        }
+        .sheet(isPresented: $showingProfile) {
+            if let settings = profileSettings {
+                ProfileView(settings: settings)
+            } else {
+                EmptyView()
+            }
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -400,6 +469,7 @@ struct HomeView: View {
             
             // Check for unrecovered run data
             checkForUnrecoveredRun()
+            loadUserSettings()
         }
         .onChange(of: trainings) { oldValue, newValue in
             updateWidgetData()
@@ -614,6 +684,45 @@ struct ActionCard: View {
                     isPressed = false
                 }
         )
+    }
+}
+
+struct ProfileAvatarView: View {
+    let imageData: Data?
+    let displayName: String
+    
+    private var initials: String {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return "ME"
+        }
+        let components = trimmed.split(separator: " ")
+        if components.count >= 2 {
+            return String(components.prefix(2).compactMap { $0.first }).uppercased()
+        } else if let first = trimmed.first {
+            return String(first).uppercased()
+        } else {
+            return "ME"
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            if let imageData, let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Circle()
+                    .fill(Color.blue.opacity(0.2))
+                Text(initials)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.blue)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.blue.opacity(0.3), lineWidth: 1))
     }
 }
 

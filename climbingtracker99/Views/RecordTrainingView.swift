@@ -14,18 +14,69 @@ struct RecordTrainingView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var exercises: [Exercise]
     
-    @State private var location: TrainingLocation = .indoor
-    @State private var focus: TrainingFocus = .strength
-    @State private var recordingStartTime: Date = Date()
-    @State private var activeExercises: [RecordedExercise] = []
-    @State private var completedExercises: [RecordedExercise] = []
-    @State private var selectedExercise: Exercise?
-    @State private var showingExerciseSelection = false
-    @State private var notes: String = ""
-    @State private var timer: Timer?
-    @State private var currentTime = Date()
-    @State private var showingCancelConfirmation = false
+    private let existingTraining: Training?
     
+    @State private var location: TrainingLocation
+    @State private var focus: TrainingFocus
+    @State private var recordingStartTime: Date
+    @State private var activeExercises: [RecordedExercise]
+    @State private var completedExercises: [RecordedExercise]
+    @State private var selectedExercise: Exercise?
+    @State private var showingExerciseSelection: Bool
+    @State private var notes: String
+    @State private var timer: Timer?
+    @State private var currentTime: Date
+    @State private var originalExerciseIDs: Set<PersistentIdentifier>
+    @State private var isCompleting: Bool
+    @State private var showCompletedExercises: Bool = true
+    
+    init(training: Training? = nil, snapshot: ActiveRecordingSnapshot? = nil) {
+        if let snapshot = snapshot {
+            self.existingTraining = snapshot.training ?? training
+            _location = State(initialValue: snapshot.location)
+            _focus = State(initialValue: snapshot.focus)
+            _recordingStartTime = State(initialValue: snapshot.startTime)
+            _activeExercises = State(initialValue: snapshot.activeExercises)
+            _completedExercises = State(initialValue: snapshot.completedExercises)
+            _selectedExercise = State(initialValue: nil)
+            _showingExerciseSelection = State(initialValue: false)
+            _notes = State(initialValue: snapshot.notes)
+            _timer = State(initialValue: nil)
+            _currentTime = State(initialValue: Date())
+            _originalExerciseIDs = State(initialValue: snapshot.originalExerciseIDs)
+            _isCompleting = State(initialValue: false)
+        } else if let training = training {
+            self.existingTraining = training
+            _location = State(initialValue: training.location)
+            _focus = State(initialValue: training.focus)
+            let baseSeconds = TimeInterval(training.totalRecordedDuration ?? training.duration * 60)
+            _recordingStartTime = State(initialValue: Date().addingTimeInterval(-baseSeconds))
+            _activeExercises = State(initialValue: [])
+            _completedExercises = State(initialValue: training.recordedExercises)
+            _selectedExercise = State(initialValue: nil)
+            _showingExerciseSelection = State(initialValue: false)
+            _notes = State(initialValue: training.notes)
+            _timer = State(initialValue: nil)
+            _currentTime = State(initialValue: Date())
+            _originalExerciseIDs = State(initialValue: Set(training.recordedExercises.map { $0.persistentModelID }))
+            _isCompleting = State(initialValue: false)
+        } else {
+            self.existingTraining = nil
+            _location = State(initialValue: .indoor)
+            _focus = State(initialValue: .strength)
+            _recordingStartTime = State(initialValue: Date())
+            _activeExercises = State(initialValue: [])
+            _completedExercises = State(initialValue: [])
+            _selectedExercise = State(initialValue: nil)
+            _showingExerciseSelection = State(initialValue: false)
+            _notes = State(initialValue: "")
+            _timer = State(initialValue: nil)
+            _currentTime = State(initialValue: Date())
+            _originalExerciseIDs = State(initialValue: [])
+            _isCompleting = State(initialValue: false)
+        }
+    }
+
     private var availableExercises: [Exercise] {
         let activeExerciseModelIds = activeExercises.map { $0.exercise.persistentModelID }
         let filtered = exercises.filter { !activeExerciseModelIds.contains($0.persistentModelID) }
@@ -46,181 +97,75 @@ struct RecordTrainingView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Header with workout timer and action buttons
-                VStack(spacing: 12) {
-                    // Main timer - centered and prominent
-                    VStack(spacing: 4) {
-                        Text("Recording Workout")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text(formatTime(totalElapsedTime))
-                            .font(.system(size: 48, weight: .bold, design: .monospaced))
-                            .foregroundColor(.blue)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+        NavigationStack {
+            ScrollViewReader { proxy in
+                ZStack {
+                    Color(.systemGroupedBackground)
+                        .ignoresSafeArea()
                     
-                    // Top action buttons
-                    HStack(spacing: 20) {
-                        // Location and Focus pickers
-                        HStack(spacing: 12) {
-                            Picker("", selection: $location) {
-                                ForEach(TrainingLocation.allCases, id: \.self) { loc in
-                                    Text(loc.rawValue).tag(loc)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .frame(width: 100)
-                            
-                            Picker("", selection: $focus) {
-                                ForEach(TrainingFocus.allCases, id: \.self) { f in
-                                    Text(f.rawValue).tag(f)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .frame(width: 100)
-                        }
-                        
-                        Spacer()
-                        
-                        // Add Exercise button
-                        Button(action: { showingExerciseSelection = true }) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(availableExercises.isEmpty ? .gray : .blue)
-                        }
-                        .disabled(availableExercises.isEmpty)
-                        
-                        // Complete Workout button
-                        if !activeExercises.isEmpty || !completedExercises.isEmpty {
-                            Button(action: completeWorkout) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                .padding(.vertical)
-                .background(Color(.systemBackground))
-                
-                Divider()
-                
-                // Active exercises (currently recording)
-                if !activeExercises.isEmpty {
                     ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(activeExercises) { recordedExercise in
-                                ExerciseRecordingCard(
-                                    recordedExercise: recordedExercise,
-                                    onComplete: {
-                                        completeExercise(recordedExercise)
-                                    },
-                                    onRemove: {
-                                        removeActiveExercise(recordedExercise)
-                                    }
-                                )
+                        VStack(spacing: 24) {
+                            summarySection
+                            
+                            if activeExercises.isEmpty && completedExercises.isEmpty {
+                                emptyStateSection
+                            } else {
+                                activeExercisesSection
+                                completedExercisesSection
+                            }
+                            
+                            notesSection
+                        }
+                        .padding(.top, 24)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 160)
+                    }
+                    .onChange(of: activeExercises.count) { oldValue, newValue in
+                        guard newValue > oldValue, let last = activeExercises.last else { return }
+                        DispatchQueue.main.async {
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+                                proxy.scrollTo(last.persistentModelID, anchor: .center)
                             }
                         }
-                        .padding()
                     }
                 }
-                
-                // Completed exercises - compact and collapsible
-                if !completedExercises.isEmpty {
-                    Divider()
-                    
-                    DisclosureGroup {
-                        ScrollView {
-                            VStack(spacing: 4) {
-                                ForEach(completedExercises) { recordedExercise in
-                                    CompletedExerciseRow(recordedExercise: recordedExercise)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .frame(maxHeight: 150)
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Completed (\(completedExercises.count))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                    }
-                    .padding(.vertical, 4)
+                .safeAreaInset(edge: .bottom) {
+                    bottomActionBar
                 }
-                
-                // Empty state message
-                if activeExercises.isEmpty && completedExercises.isEmpty {
-                    Spacer()
-                    VStack(spacing: 16) {
-                        Image(systemName: "figure.climbing")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No exercises started")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text("Tap the + button to add an exercise")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
-            }
-            .navigationTitle("Record Training")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        // Only show confirmation if there's active recording
-                        if !activeExercises.isEmpty || !completedExercises.isEmpty {
-                            showingCancelConfirmation = true
-                        } else {
-                            dismiss()
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                            Text("Back")
+                .navigationTitle("Record Training")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: { dismiss() }) {
+                            Label("Close", systemImage: "xmark.circle.fill")
+                                .labelStyle(.iconOnly)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.primary)
                         }
                     }
                 }
-            }
-            .alert("Cancel Recording?", isPresented: $showingCancelConfirmation) {
-                Button("Cancel Recording", role: .destructive) {
-                    dismiss()
-                }
-                Button("Continue Recording", role: .cancel) { }
-            } message: {
-                Text("Are you sure you want to cancel this recording? All progress will be lost.")
-            }
-            .sheet(isPresented: $showingExerciseSelection) {
-                ExerciseSelectionSheet(
-                    exercises: availableExercises,
-                    onSelect: { exercise in
-                        addExercise(exercise)
-                        showingExerciseSelection = false
-                    }
-                )
             }
         }
+        .sheet(isPresented: $showingExerciseSelection) {
+            ExerciseSelectionSheet(
+                exercises: availableExercises,
+                onSelect: { exercise in
+                    addExercise(exercise)
+                    showingExerciseSelection = false
+                }
+            )
+        }
         .onAppear {
-            recordingStartTime = Date()
-            currentTime = Date()
-            // Start timer to update continuously
-            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                currentTime = Date()
-            }
+            startTimerIfNeeded()
         }
         .onDisappear {
             timer?.invalidate()
+            timer = nil
+            if isCompleting {
+                RecordingManager.shared.snapshot = nil
+            } else {
+                storeSnapshot()
+            }
         }
     }
     
@@ -270,6 +215,7 @@ struct RecordTrainingView: View {
     }
     
     private func completeWorkout() {
+        isCompleting = true
         // Complete any remaining active exercises
         for exercise in activeExercises {
             exercise.isCompleted = true
@@ -282,36 +228,76 @@ struct RecordTrainingView: View {
         }
         activeExercises.removeAll()
         
-        // Create training session
-        let training = Training(
-            date: recordingStartTime,
-            duration: Int(totalElapsedTime / 60),
+        if let training = existingTraining {
+            let newExercises = completedExercises.filter { !originalExerciseIDs.contains($0.persistentModelID) }
+            if !newExercises.isEmpty {
+                for exercise in newExercises {
+                    training.recordedExercises.append(exercise)
+                    modelContext.insert(exercise)
+                    originalExerciseIDs.insert(exercise.persistentModelID)
+                }
+            }
+            training.location = location
+            training.focus = focus
+            training.notes = notes
+            training.recordingEndTime = Date()
+            let totalSeconds = Int(totalElapsedTime)
+            training.totalRecordedDuration = totalSeconds
+            training.duration = max(1, totalSeconds / 60)
+            do {
+                try modelContext.save()
+                FirebaseSyncManager.shared.triggerFullSync()
+            } catch {
+                print("Error updating training: \(error.localizedDescription)")
+            }
+            RecordingManager.shared.snapshot = nil
+            dismiss()
+        } else {
+            // Create training session
+            let training = Training(
+                date: recordingStartTime,
+                duration: Int(totalElapsedTime / 60),
+                location: location,
+                focus: focus,
+                recordedExercises: completedExercises,
+                notes: notes,
+                media: [],
+                isRecorded: true,
+                recordingStartTime: recordingStartTime
+            )
+            training.recordingEndTime = Date()
+            training.totalRecordedDuration = Int(totalElapsedTime)
+
+            modelContext.insert(training)
+
+            // Insert all recorded exercises
+            for exercise in completedExercises {
+                modelContext.insert(exercise)
+            }
+
+            do {
+                try modelContext.save()
+                FirebaseSyncManager.shared.triggerFullSync()
+            } catch {
+                print("Error saving training: \(error.localizedDescription)")
+            }
+            RecordingManager.shared.snapshot = nil
+
+            dismiss()
+        }
+    }
+    
+    private func storeSnapshot() {
+        RecordingManager.shared.snapshot = ActiveRecordingSnapshot(
+            training: existingTraining,
             location: location,
             focus: focus,
-            recordedExercises: completedExercises,
+            startTime: recordingStartTime,
             notes: notes,
-            media: [],
-            isRecorded: true,
-            recordingStartTime: recordingStartTime
+            activeExercises: activeExercises,
+            completedExercises: completedExercises,
+            originalExerciseIDs: originalExerciseIDs
         )
-        training.recordingEndTime = Date()
-        training.totalRecordedDuration = Int(totalElapsedTime)
-        
-        modelContext.insert(training)
-        
-        // Insert all recorded exercises
-        for exercise in completedExercises {
-            modelContext.insert(exercise)
-        }
-        
-        // Explicitly save to ensure training is persisted immediately
-        do {
-            try modelContext.save()
-        } catch {
-            print("Error saving training: \(error.localizedDescription)")
-        }
-        
-        dismiss()
     }
     
     private func formatTime(_ timeInterval: TimeInterval) -> String {
@@ -323,6 +309,346 @@ struct RecordTrainingView: View {
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         } else {
             return String(format: "%02d:%02d", minutes, seconds)
+        }
+    }
+
+    private var canComplete: Bool {
+        !activeExercises.isEmpty || !completedExercises.isEmpty
+    }
+
+    private func startTimerIfNeeded() {
+        guard timer == nil else { return }
+        currentTime = Date()
+        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            currentTime = Date()
+        }
+    }
+
+    private var summarySection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Session Timer")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(formatTime(totalElapsedTime))
+                        .font(.system(size: 44, weight: .bold, design: .monospaced))
+                        .foregroundColor(.primary)
+                    Text("Started \(recordingStartTime, style: .time)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 12) {
+                    locationMenu
+                    focusMenu
+                }
+            }
+
+            Divider()
+
+            HStack(spacing: 12) {
+                statChip(icon: "stopwatch", title: "Active", value: "\(activeExercises.count)")
+                statChip(icon: "checkmark.circle", title: "Completed", value: "\(completedExercises.count)")
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 12, x: 0, y: 6)
+    }
+
+    @ViewBuilder
+    private var activeExercisesSection: some View {
+        if !activeExercises.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                sectionHeader(
+                    title: "Active Exercises",
+                    subtitle: "\(activeExercises.count) in progress",
+                    systemImage: "figure.strengthtraining.traditional"
+                )
+
+                LazyVStack(spacing: 16) {
+                    ForEach(activeExercises) { recordedExercise in
+                        ExerciseRecordingCard(
+                            recordedExercise: recordedExercise,
+                            onComplete: { completeExercise(recordedExercise) },
+                            onRemove: { removeActiveExercise(recordedExercise) }
+                        )
+                        .id(recordedExercise.persistentModelID)
+                    }
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+        }
+    }
+
+    @ViewBuilder
+    private var completedExercisesSection: some View {
+        if !completedExercises.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                DisclosureGroup(isExpanded: $showCompletedExercises) {
+                    LazyVStack(spacing: 12) {
+                        ForEach(completedExercises) { recordedExercise in
+                            CompletedExerciseRow(recordedExercise: recordedExercise)
+                                .id(recordedExercise.persistentModelID)
+                        }
+                    }
+                    .padding(.top, 12)
+                } label: {
+                    sectionHeader(
+                        title: "Completed Exercises",
+                        subtitle: "\(completedExercises.count) finished",
+                        systemImage: "checkmark.circle"
+                    )
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(.systemBackground))
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+        }
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeader(
+                title: "Session Notes",
+                subtitle: "Optional",
+                systemImage: "square.and.pencil"
+            )
+
+            ZStack(alignment: .topLeading) {
+                if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Add notes, beta, or reminders for this training.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                }
+
+                TextEditor(text: $notes)
+                    .frame(minHeight: 130)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color.clear)
+                    .scrollContentBackground(.hidden)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+            )
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 4)
+    }
+
+    private var emptyStateSection: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "figure.climbing")
+                .font(.system(size: 64))
+                .foregroundColor(.secondary)
+            Text("Ready to start your session?")
+                .font(.headline)
+            Text("Tap \"Add Exercise\" below to begin recording climbs, sets, and benchmarks.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(.systemBackground))
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 12, x: 0, y: 6)
+    }
+
+    private var bottomActionBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                Button {
+                    showingExerciseSelection = true
+                } label: {
+                    Label("Add Exercise", systemImage: "plus.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.blue)
+                .disabled(availableExercises.isEmpty)
+
+                Button {
+                    completeWorkout()
+                } label: {
+                    Label("Finish Session", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.green)
+                .opacity(canComplete ? 1 : 0.4)
+                .disabled(!canComplete)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial)
+        }
+    }
+
+    private func sectionHeader(title: String, subtitle: String?, systemImage: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                if let subtitle = subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    private func statChip(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text(value)
+                    .font(.headline)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private func selectionChip(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundColor(.blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private var locationMenu: some View {
+        Menu {
+            ForEach(TrainingLocation.allCases, id: \.self) { option in
+                Button(action: { location = option }) {
+                    if option == location {
+                        Label(option.rawValue, systemImage: "checkmark")
+                    } else {
+                        Text(option.rawValue)
+                    }
+                }
+            }
+        } label: {
+            selectionChip(
+                icon: locationIcon(for: location),
+                title: "Location",
+                value: location.rawValue
+            )
+        }
+    }
+
+    private var focusMenu: some View {
+        Menu {
+            ForEach(TrainingFocus.allCases, id: \.self) { option in
+                Button(action: { focus = option }) {
+                    if option == focus {
+                        Label(option.rawValue, systemImage: "checkmark")
+                    } else {
+                        Text(option.rawValue)
+                    }
+                }
+            }
+        } label: {
+            selectionChip(
+                icon: focusIcon(for: focus),
+                title: "Focus",
+                value: focus.rawValue
+            )
+        }
+    }
+
+    private func locationIcon(for location: TrainingLocation) -> String {
+        switch location {
+        case .indoor:
+            return "building.2.fill"
+        case .outdoor:
+            return "leaf.fill"
+        }
+    }
+
+    private func focusIcon(for focus: TrainingFocus) -> String {
+        switch focus {
+        case .strength:
+            return "dumbbell"
+        case .power:
+            return "bolt.fill"
+        case .endurance:
+            return "figure.run"
+        case .technique:
+            return "scope"
+        case .mobility:
+            return "figure.walk"
         }
     }
 }
@@ -338,32 +664,41 @@ struct ExerciseSelectionSheet: View {
     ]
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(exercises) { exercise in
-                        Button(action: {
-                            onSelect(exercise)
-                        }) {
-                            VStack(spacing: 8) {
-                                Image(exercise.type.imageName)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                
-                                Text(exercise.type.rawValue)
-                                    .font(.subheadline)
-                                    .foregroundColor(.primary)
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(exercises) { exercise in
+                            Button(action: {
+                                onSelect(exercise)
+                            }) {
+                                VStack(spacing: 8) {
+                                    Image(exercise.type.imageName)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(height: 100)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                    Text(exercise.type.rawValue)
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color(.systemBackground))
+                                )
+                                .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
                             }
-                            .padding()
-                            .background(Color(.systemBackground))
-                            .cornerRadius(12)
-                            .shadow(radius: 2)
                         }
                     }
+                    .padding()
                 }
-                .padding()
             }
             .navigationTitle("Select Exercise")
             .navigationBarTitleDisplayMode(.inline)
@@ -437,7 +772,7 @@ struct ExerciseRecordingCard: View {
             }
             
             // Exercise-specific controls - All now use full-screen workout buttons
-            if exercise.type == .flexibility {
+                if exercise.type == .flexibility {
                 FlexibilityWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
             } else if exercise.type == .pullups {
                 PullupsWorkoutButton(recordedExercise: recordedExercise, onComplete: onComplete)
@@ -604,9 +939,14 @@ struct ExerciseRecordingCard: View {
     }
     
     private func startTimer() {
-        recordedExercise.recordedStartTime = Date()
+        if recordedExercise.recordedStartTime == nil {
+            recordedExercise.recordedStartTime = Date()
+        }
         isRunning = true
         isPaused = false
+        if let startTime = recordedExercise.recordedStartTime {
+            elapsedTime = Date().timeIntervalSince(startTime) - Double(recordedExercise.pausedDuration)
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
             if let startTime = recordedExercise.recordedStartTime {
                 elapsedTime = Date().timeIntervalSince(startTime) - Double(recordedExercise.pausedDuration)
@@ -5560,4 +5900,6 @@ struct FlowLayout: Layout {
         }
     }
 }
+
+
 

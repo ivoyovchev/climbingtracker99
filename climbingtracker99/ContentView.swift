@@ -10,6 +10,7 @@ import SwiftData
 import WidgetKit
 import Charts
 import UserNotifications
+import FirebaseAuth
 
 struct TabNavigationTitle: ViewModifier {
     let title: String
@@ -31,10 +32,22 @@ extension View {
     func tabNavigationTitle(_ title: String) -> some View {
         modifier(TabNavigationTitle(title: title))
     }
+    @ViewBuilder
+    func ifLet<T, Content: View>(_ value: T?, transform: (Self, T) -> Content) -> some View {
+        if let value = value {
+            transform(self, value)
+        } else {
+            self
+        }
+    }
 }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var recordingManager = RecordingManager.shared
+    @State private var showingActiveRecording = false
+    @State private var showingCancelRecordingAlert = false
+    @State private var activeRecordingSnapshot: ActiveRecordingSnapshot?
     
     var body: some View {
         TabView {
@@ -46,6 +59,11 @@ struct ContentView: View {
             ActivityView()
                 .tabItem {
                     Label("Activity", systemImage: "list.bullet.rectangle")
+                }
+            
+            BasecampView()
+                .tabItem {
+                    Label("Basecamp", systemImage: "person.2.fill")
                 }
             
             PlanView()
@@ -68,6 +86,39 @@ struct ContentView: View {
                     Label("Settings", systemImage: "gear")
                 }
         }
+        .safeAreaInset(edge: .top) {
+            if let snapshot = recordingManager.snapshot {
+                ActiveRecordingBanner(
+                    snapshot: snapshot,
+                    onResume: {
+                        activeRecordingSnapshot = snapshot
+                        RecordingManager.shared.snapshot = nil
+                        showingActiveRecording = true
+                    },
+                    onCancel: { showingCancelRecordingAlert = true }
+                )
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+        }
+        .fullScreenCover(isPresented: $showingActiveRecording, onDismiss: {
+            activeRecordingSnapshot = nil
+        }) {
+            if let snapshot = activeRecordingSnapshot {
+                RecordTrainingView(training: snapshot.training, snapshot: snapshot)
+            } else {
+                RecordTrainingView()
+            }
+        }
+        .alert("End current training?", isPresented: $showingCancelRecordingAlert) {
+            Button("Stop Recording", role: .destructive) {
+                RecordingManager.shared.snapshot = nil
+                activeRecordingSnapshot = nil
+            }
+            Button("Continue", role: .cancel) { }
+        } message: {
+            Text("This will discard the ongoing training session.")
+        }
     }
 }
 
@@ -78,10 +129,6 @@ struct HealthView: View {
     @State private var entryToEdit: WeightEntry?
     @State private var isSyncingHealth = false
     @State private var showingCustomize = false
-    
-    // Range selection
-    enum MetricRange: String, CaseIterable, Identifiable { case week = "Week", month = "Month", year = "Year"; var id: String { rawValue } }
-    @State private var selectedRange: MetricRange = .week
     
     // HealthKit-backed state
     @State private var hkWeight: [(date: Date, kg: Double)] = []
@@ -101,23 +148,12 @@ struct HealthView: View {
         .init(type: .energy, enabled: true)
     ]
     
-    private func rangeStartDate() -> Date {
-        let now = Date()
-        switch selectedRange {
-        case .week: return Calendar.current.date(byAdding: .day, value: -7, to: now) ?? now
-        case .month: return Calendar.current.date(byAdding: .month, value: -1, to: now) ?? now
-        case .year: return Calendar.current.date(byAdding: .year, value: -1, to: now) ?? now
-        }
-    }
-    
     private func filterSeries(_ series: [(Date, Double)]) -> [(Date, Double)] {
-        let start = rangeStartDate()
+        let start = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
         let filtered = series.filter { $0.0 >= start }
         if !filtered.isEmpty { return filtered }
         // Fallback: show recent points if range has no data
-        let counts: [MetricRange: Int] = [.week: 14, .month: 60, .year: 365]
-        let n = counts[selectedRange] ?? 30
-        return Array(series.suffix(n))
+        return Array(series.suffix(365))
     }
     
     // Aggregations
@@ -134,6 +170,18 @@ struct HealthView: View {
             }
         }
         return byDay.map { ($0.key, $0.value.1) }.sorted { $0.0 < $1.0 }
+    }
+    private var weightYAxisRange: ClosedRange<Double>? {
+        let data = filterSeries(weightSeries)
+        guard !data.isEmpty else { return nil }
+        let weights = data.map { $0.1 }
+        guard let minVal = weights.min(), let maxVal = weights.max() else { return nil }
+        let lower = minVal - 5
+        let upper = maxVal + 5
+        if lower == upper {
+            return (lower - 1)...(upper + 1)
+        }
+        return lower...upper
     }
     private var sleepDailyHours: [(Date, Double)] {
         var map: [Date: Double] = [:]
@@ -152,20 +200,33 @@ struct HealthView: View {
         }
         return map.map { ($0.key, $0.value) }.sorted { $0.0 < $1.0 }
     }
+    private var sleepLastNightHours: Double? {
+        sleepDailyHours.last?.1
+    }
+    private var sleepSevenDayAverage: Double? {
+        guard !sleepDailyHours.isEmpty else { return nil }
+        let start = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let recentValues = sleepDailyHours.filter { $0.0 >= start }
+        let samples = recentValues.isEmpty ? Array(sleepDailyHours.suffix(min(7, sleepDailyHours.count))) : recentValues
+        guard !samples.isEmpty else { return nil }
+        let totalHours = samples.reduce(0) { $0 + $1.1 }
+        return totalHours / Double(samples.count)
+    }
+    private var sleepAllTimeAverage: Double? {
+        guard !sleepDailyHours.isEmpty else { return nil }
+        let values = sleepDailyHours.map { $0.1 }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
     private var hrSeries: [(Date, Double)] { hkHRSamples.sorted { $0.0 < $1.0 } }
     private var energySeries: [(Date, Double)] { hkEnergyDaily.sorted { $0.0 < $1.0 } }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
                     TabHeaderView(title: "Health") {
                         HStack(spacing: 16) {
-                            Picker("", selection: $selectedRange) {
-                                ForEach(MetricRange.allCases) { r in Text(r.rawValue).tag(r) }
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(maxWidth: 240)
                             Button(action: { showingCustomize = true }) { Image(systemName: "slider.horizontal.3").font(.system(size: 22)) }
                             Button(action: { syncWithAppleHealth() }) {
                                 if isSyncingHealth { ProgressView().progressViewStyle(CircularProgressViewStyle()) }
@@ -180,9 +241,9 @@ struct HealthView: View {
                             if metricConfigs[idx].enabled {
                                 switch metricConfigs[idx].type {
                                 case .weight:
-                                    MetricChart(title: "Weight", unit: "kg", color: .blue, series: filterSeries(weightSeries))
+                                    MetricChart(title: "Weight", unit: "kg", color: .blue, series: filterSeries(weightSeries), yRange: weightYAxisRange)
                                 case .sleep:
-                                    MetricChart(title: "Sleep", unit: "h", color: .purple, series: filterSeries(sleepDailyHours))
+                                    SleepSummaryView(lastNightHours: sleepLastNightHours, sevenDayAverage: sleepSevenDayAverage, allTimeAverage: sleepAllTimeAverage)
                                 case .heartRate:
                                     MetricChart(title: "Heart Rate", unit: "bpm", color: .red, series: filterSeries(hrSeries))
                                 case .energy:
@@ -204,7 +265,7 @@ struct HealthView: View {
     }
     
     private var customizeSheet: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach($metricConfigs) { $config in
                     HStack {
@@ -293,6 +354,14 @@ private struct MetricChart: View {
     let unit: String
     let color: Color
     let series: [(Date, Double)]
+    let yRange: ClosedRange<Double>?
+    init(title: String, unit: String, color: Color, series: [(Date, Double)], yRange: ClosedRange<Double>? = nil) {
+        self.title = title
+        self.unit = unit
+        self.color = color
+        self.series = series
+        self.yRange = yRange
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.headline)
@@ -304,8 +373,12 @@ private struct MetricChart: View {
                         LineMark(x: .value("Date", p.0), y: .value(unit, p.1))
                             .foregroundStyle(color)
                         PointMark(x: .value("Date", p.0), y: .value(unit, p.1))
+                            .symbolSize(36)
                             .foregroundStyle(color.opacity(0.8))
                     }
+                }
+                .ifLet(yRange) { chart, range in
+                    chart.chartYScale(domain: range)
                 }
                 .frame(height: 220)
             }
@@ -361,10 +434,92 @@ private struct Sparkline: View {
     }
 }
 
+private struct SleepSummaryView: View {
+    let lastNightHours: Double?
+    let sevenDayAverage: Double?
+    let allTimeAverage: Double?
+    
+    private func formattedHours(_ hours: Double?) -> String {
+        guard let hours = hours else { return "--" }
+        let totalMinutes = Int((hours * 60).rounded())
+        let h = totalMinutes / 60
+        let m = totalMinutes % 60
+        switch (h, m) {
+        case (_, 0): return "\(h)h"
+        case (0, _): return "\(m)m"
+        default: return "\(h)h \(m)m"
+        }
+    }
+    
+    private func trend(for value: Double?) -> (String, Color, String) {
+        guard let value = value, let baseline = allTimeAverage else {
+            return ("arrow.right", .secondary, "")
+        }
+        let diff = value - baseline
+        let threshold = 0.1 // ~6 minutes
+        if diff > threshold {
+            let minutes = Int((diff * 60).rounded())
+            return ("arrow.up", .green, String(format: "+%d min", minutes))
+        } else if diff < -threshold {
+            let minutes = Int((abs(diff) * 60).rounded())
+            return ("arrow.down", .red, String(format: "-%d min", minutes))
+        } else {
+            return ("arrow.right", .secondary, "0 min")
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sleep")
+                .font(.headline)
+            SleepStatRow(title: "Last Night", value: formattedHours(lastNightHours), trend: trend(for: lastNightHours))
+            SleepStatRow(title: "7-day Avg", value: formattedHours(sevenDayAverage), trend: trend(for: sevenDayAverage))
+        }
+        .padding(12)
+        .background(Color(.systemBackground))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+        .cornerRadius(12)
+    }
+}
+
+private struct SleepStatRow: View {
+    let title: String
+    let value: String
+    let trend: (String, Color, String)
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text(value)
+                    .font(.title3)
+                    .bold()
+            }
+            Spacer()
+            HStack(spacing: 6) {
+                Image(systemName: trend.0)
+                    .foregroundColor(trend.1)
+                    .font(.title3)
+                if !trend.2.isEmpty {
+                    Text(trend.2)
+                        .font(.footnote)
+                        .foregroundColor(trend.1)
+                }
+            }
+        }
+    }
+}
+
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var userSettings: [UserSettings]
-    @Query private var weightEntries: [WeightEntry]
+    @Query private var goals: [Goals]
+    @Query private var plannedTrainings: [PlannedTraining]
+    @Query private var plannedRuns: [PlannedRun]
+    @Query private var plannedBenchmarks: [PlannedBenchmark]
+    @Query private var exercises: [Exercise]
     @Query private var moonLogs: [MoonLogEntry]
     @State private var showingResetAlert = false
     @State private var showingWelcome = false
@@ -372,14 +527,91 @@ struct SettingsView: View {
     @State private var moonPassword: String = ""
     @State private var syncingMoon = false
     @State private var moonSyncMessage: String = ""
+    @State private var isAuthErrorsVisible = false
+    @State private var isShowingResetConfirmation = false
+    
+    enum AuthMode: String, CaseIterable, Identifiable {
+        case signIn = "Sign In"
+        case signUp = "Sign Up"
+        var id: String { rawValue }
+    }
+    @State private var currentFirebaseUser: FirebaseAuth.User? = Auth.auth().currentUser
+    @State private var authStateHandle: AuthStateDidChangeListenerHandle?
+    @State private var authEmail: String = ""
+    @State private var authPassword: String = ""
+    @State private var authStatusMessage: String = ""
+    @State private var authStatusColor: Color = .secondary
+    @State private var isProcessingAuth: Bool = false
+    @State private var authMode: AuthMode = .signIn
     
     private var settings: UserSettings? {
         userSettings.first
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
+                Section(header: Text("Account")) {
+                    if let user = currentFirebaseUser {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Signed in as")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(user.email ?? "Unknown email")
+                                .font(.body)
+                            Text("User ID: \(user.uid)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        if isProcessingAuth {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            Button(role: .destructive) {
+                                signOut()
+                            } label: {
+                                Text("Sign Out")
+                            }
+                        }
+                    } else {
+                        Picker("", selection: $authMode) {
+                            ForEach(AuthMode.allCases) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.vertical, 4)
+                        TextField("Email", text: $authEmail)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textContentType(.emailAddress)
+                        SecureField("Password", text: $authPassword)
+                            .textContentType(.password)
+                        if authMode == .signUp {
+                            Text("Password must be at least 6 characters.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        if isProcessingAuth {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            Button(authMode == .signIn ? "Sign In" : "Create Account") {
+                                handleAuthAction()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(authEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || authPassword.count < 6)
+                        }
+                    }
+                    if !authStatusMessage.isEmpty {
+                        Text(authStatusMessage)
+                            .font(.footnote)
+                            .foregroundColor(authStatusColor)
+                            .padding(.top, 4)
+                    }
+                }
+                
                 Section(header: Text("MoonBoard")) {
                     HStack {
                         Text("Username")
@@ -569,6 +801,24 @@ struct SettingsView: View {
                 WelcomeView(showingWelcome: $showingWelcome)
             }
         }
+        .onAppear {
+            if authStateHandle == nil {
+                authStateHandle = Auth.auth().addStateDidChangeListener { _, user in
+                    DispatchQueue.main.async {
+                        self.currentFirebaseUser = user
+                        if let email = user?.email {
+                            self.authEmail = email
+                        }
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            if let handle = authStateHandle {
+                Auth.auth().removeStateDidChangeListener(handle)
+                authStateHandle = nil
+            }
+        }
     }
     
     private func syncMoonBoard() async {
@@ -606,6 +856,71 @@ struct SettingsView: View {
             moonSyncMessage = "Sync failed"
         }
         syncingMoon = false
+    }
+    
+    private func handleAuthAction() {
+        let email = authEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !email.isEmpty else {
+            authStatusColor = .red
+            authStatusMessage = "Please enter an email address."
+            return
+        }
+        guard authPassword.count >= 6 else {
+            authStatusColor = .red
+            authStatusMessage = "Password must be at least 6 characters."
+            return
+        }
+        isProcessingAuth = true
+        authStatusMessage = ""
+        if authMode == .signUp {
+            Auth.auth().createUser(withEmail: email, password: authPassword) { result, error in
+                handleAuthResult(user: result?.user, error: error, successMessage: "Account created successfully.")
+            }
+        } else {
+            Auth.auth().signIn(withEmail: email, password: authPassword) { result, error in
+                handleAuthResult(user: result?.user, error: error, successMessage: "Signed in successfully.")
+            }
+        }
+    }
+    
+    private func handleAuthResult(user: FirebaseAuth.User?, error: Error?, successMessage: String) {
+        DispatchQueue.main.async {
+            self.isProcessingAuth = false
+            if let error = error {
+                self.authStatusColor = .red
+                self.authStatusMessage = error.localizedDescription
+                return
+            }
+            self.authStatusColor = .green
+            self.authStatusMessage = successMessage
+            self.authPassword = ""
+            if let user = user {
+                self.currentFirebaseUser = user
+                self.authEmail = user.email ?? self.authEmail
+                FirebaseSyncManager.shared.triggerFullSync()
+            }
+            self.authMode = .signIn
+        }
+    }
+    
+    private func signOut() {
+        isProcessingAuth = true
+        do {
+            try Auth.auth().signOut()
+            DispatchQueue.main.async {
+                self.isProcessingAuth = false
+                self.currentFirebaseUser = nil
+                self.authStatusColor = .secondary
+                self.authStatusMessage = "Signed out."
+                self.authPassword = ""
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.isProcessingAuth = false
+                self.authStatusColor = .red
+                self.authStatusMessage = error.localizedDescription
+            }
+        }
     }
     
     private func resetAllData() {

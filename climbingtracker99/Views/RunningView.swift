@@ -2,6 +2,7 @@ import SwiftUI
 import MapKit
 import SwiftData
 import ActivityKit
+import UIKit
 
 struct RunningView: View {
     @Environment(\.modelContext) private var modelContext
@@ -406,11 +407,12 @@ struct RunningView: View {
         guard let startTime = runStartTime else { return }
         
         let (locations, finalStats) = locationManager.stopTracking()
+        let coordinates = locations.map { $0.coordinate }
         
         // Clear backup after successful save
         UserDefaults.standard.removeObject(forKey: "runningSessionBackup")
         
-        // Save running session
+        // Prepare running session model
         let session = RunningSession(
             startTime: startTime,
             endTime: Date(),
@@ -424,7 +426,7 @@ struct RunningView: View {
             averageSpeed: finalStats.duration > 0 ? finalStats.distance / finalStats.duration : 0
         )
         
-        session.routeCoordinates = locations.map { $0.coordinate }
+        session.routeCoordinates = coordinates
         session.splits = locationManager.getSplits()
         
         // Add note if GPS data is incomplete
@@ -434,27 +436,137 @@ struct RunningView: View {
             session.notes = "Note: Limited GPS data recorded (\(locations.count) points)."
         }
         
-        do {
-            modelContext.insert(session)
-            try modelContext.save()
-            print("Run saved successfully")
-        } catch {
-            print("Error saving run: \(error.localizedDescription)")
-            // If save fails, restore backup to UserDefaults for recovery
-            let runBackup: [String: Any] = [
-                "startTime": startTime.timeIntervalSince1970,
-                "distance": finalStats.distance,
-                "duration": finalStats.duration,
-                "averagePace": finalStats.averagePace,
-                "calories": finalStats.calories,
-                "elevationGain": finalStats.elevationGain,
-                "elevationLoss": finalStats.elevationLoss,
-                "locationCount": locations.count,
-                "isPaused": false
-            ]
-            UserDefaults.standard.set(runBackup, forKey: "runningSessionBackup")
-            UserDefaults.standard.set(true, forKey: "hasUnrecoveredRun")
+        Task {
+            let snapshotData = await generateRouteSnapshotData(from: coordinates)
+            
+            await MainActor.run {
+                if let snapshotData,
+                   !session.media.contains(where: { $0.isRouteSnapshot }) {
+                    let snapshotMedia = Media(type: .image, imageData: snapshotData)
+                    snapshotMedia.isRouteSnapshot = true
+                    snapshotMedia.runningSession = session
+                    snapshotMedia.date = startTime
+                    session.media.append(snapshotMedia)
+                }
+                
+                do {
+                    modelContext.insert(session)
+                    for media in session.media {
+                        modelContext.insert(media)
+                    }
+                    try modelContext.save()
+                    print("Run saved successfully")
+                } catch {
+                    print("Error saving run: \(error.localizedDescription)")
+                    let runBackup: [String: Any] = [
+                        "startTime": startTime.timeIntervalSince1970,
+                        "distance": finalStats.distance,
+                        "duration": finalStats.duration,
+                        "averagePace": finalStats.averagePace,
+                        "calories": finalStats.calories,
+                        "elevationGain": finalStats.elevationGain,
+                        "elevationLoss": finalStats.elevationLoss,
+                        "locationCount": locations.count,
+                        "isPaused": false
+                    ]
+                    UserDefaults.standard.set(runBackup, forKey: "runningSessionBackup")
+                    UserDefaults.standard.set(true, forKey: "hasUnrecoveredRun")
+                }
+            }
         }
+    }
+}
+
+// MARK: - Snapshot Helpers
+
+private extension RunningView {
+    func generateRouteSnapshotData(from coordinates: [CLLocationCoordinate2D]) async -> Data? {
+        guard coordinates.count > 1 else { return nil }
+        
+        let options = MKMapSnapshotter.Options()
+        options.mapType = .standard
+        options.traitCollection = UITraitCollection(userInterfaceStyle: .light)
+        options.pointOfInterestFilter = .excludingAll
+        options.size = CGSize(width: 720, height: 540)
+        options.region = snapshotRegion(for: coordinates)
+        
+        let snapshotter = MKMapSnapshotter(options: options)
+        do {
+            let snapshot = try await snapshotter.start()
+            let rendered = renderRoute(on: snapshot, coordinates: coordinates)
+            return rendered.jpegData(compressionQuality: 0.82)
+        } catch {
+            print("Failed to generate route snapshot: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    func snapshotRegion(for coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion {
+        let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
+        var rect = polyline.boundingMapRect
+        let padding = max(rect.size.width, rect.size.height) * 0.25
+        rect = rect.insetBy(dx: -padding, dy: -padding)
+        if rect.size.width < 1_000 {
+            rect.size.width = 1_000
+        }
+        if rect.size.height < 1_000 {
+            rect.size.height = 1_000
+        }
+        return MKCoordinateRegion(rect)
+    }
+    
+    func renderRoute(on snapshot: MKMapSnapshotter.Snapshot, coordinates: [CLLocationCoordinate2D]) -> UIImage {
+        let baseImage = snapshot.image
+        UIGraphicsBeginImageContextWithOptions(baseImage.size, true, baseImage.scale)
+        baseImage.draw(at: .zero)
+        
+        guard let context = UIGraphicsGetCurrentContext(),
+              let firstCoordinate = coordinates.first,
+              let lastCoordinate = coordinates.last else {
+            UIGraphicsEndImageContext()
+            return baseImage
+        }
+        
+        context.setLineWidth(max(4, baseImage.size.width * 0.006))
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        context.setStrokeColor(UIColor.systemGreen.cgColor)
+        
+        let path = UIBezierPath()
+        var previousPoint: CGPoint?
+        
+        for coordinate in coordinates {
+            let point = snapshot.point(for: coordinate)
+            if previousPoint == nil {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+            previousPoint = point
+        }
+        
+        path.stroke()
+        
+        func drawMarker(at coordinate: CLLocationCoordinate2D, color: UIColor) {
+            let point = snapshot.point(for: coordinate)
+            let markerSize: CGFloat = 14
+            let rect = CGRect(x: point.x - markerSize / 2,
+                              y: point.y - markerSize / 2,
+                              width: markerSize,
+                              height: markerSize)
+            context.setFillColor(color.cgColor)
+            context.fillEllipse(in: rect)
+            context.setStrokeColor(UIColor.white.cgColor)
+            context.setLineWidth(3)
+            context.strokeEllipse(in: rect)
+        }
+        
+        drawMarker(at: firstCoordinate, color: .systemGreen)
+        drawMarker(at: lastCoordinate, color: .systemRed)
+        
+        let renderedImage = UIGraphicsGetImageFromCurrentImageContext() ?? baseImage
+        UIGraphicsEndImageContext()
+        return renderedImage
     }
 }
 

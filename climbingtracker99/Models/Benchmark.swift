@@ -94,6 +94,7 @@ enum BenchmarkType: String, CaseIterable, Codable {
 
 @Model
 final class PlannedBenchmark {
+    var syncIdentifier: String?
     var date: Date
     var benchmarkType: BenchmarkType
     var estimatedTime: Date? // Time of day for the benchmark (default 5:30 PM)
@@ -128,7 +129,8 @@ final class PlannedBenchmark {
         }
     }
     
-    init(date: Date, benchmarkType: BenchmarkType, estimatedTime: Date? = nil, notes: String? = nil) {
+    init(date: Date, benchmarkType: BenchmarkType, estimatedTime: Date? = nil, notes: String? = nil, syncIdentifier: String? = nil) {
+        self.syncIdentifier = syncIdentifier ?? UUID().uuidString
         self.date = date
         self.benchmarkType = benchmarkType
         self.estimatedTime = estimatedTime ?? Self.defaultTime

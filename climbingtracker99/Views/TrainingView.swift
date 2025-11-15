@@ -27,6 +27,7 @@ public struct TrainingView: View {
     @State private var showingAddTraining = false
     @State private var showingRecordTraining = false
     @State private var trainingToEdit: Training?
+    @State private var activeRecordingSnapshot: ActiveRecordingSnapshot?
     
     public init() {}
     
@@ -39,7 +40,15 @@ public struct TrainingView: View {
                             Label("Log Training", systemImage: "pencil")
                         }
                         
-                        Button(action: { showingRecordTraining = true }) {
+                        Button(action: {
+                            if let snapshot = RecordingManager.shared.snapshot {
+                                activeRecordingSnapshot = snapshot
+                                RecordingManager.shared.snapshot = nil
+                            } else {
+                                activeRecordingSnapshot = nil
+                            }
+                            showingRecordTraining = true
+                        }) {
                             Label("Record Training", systemImage: "record.circle")
                         }
                     } label: {
@@ -54,8 +63,14 @@ public struct TrainingView: View {
             .sheet(isPresented: $showingAddTraining) {
                 TrainingEditView()
             }
-            .fullScreenCover(isPresented: $showingRecordTraining) {
-                RecordTrainingView()
+            .fullScreenCover(isPresented: $showingRecordTraining, onDismiss: {
+                activeRecordingSnapshot = nil
+            }) {
+                if let snapshot = activeRecordingSnapshot {
+                    RecordTrainingView(training: snapshot.training, snapshot: snapshot)
+                } else {
+                    RecordTrainingView()
+                }
             }
             .sheet(item: $trainingToEdit) { training in
                 TrainingEditView(training: training)
@@ -320,6 +335,9 @@ struct TrainingEditView: View {
                             ForEach(selectedMedia) { media in
                                 MediaThumbnail(media: media, onDelete: {
                                     selectedMedia.removeAll { $0.id == media.id }
+                                    Task {
+                                        await FirebaseSyncManager.shared.deleteRemoteMediaIfNeeded(media: media)
+                                    }
                                 })
                             }
                             

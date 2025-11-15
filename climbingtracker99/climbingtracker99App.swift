@@ -9,13 +9,32 @@ import SwiftUI
 import SwiftData
 import WidgetKit
 import UserNotifications
+import UIKit
+import FirebaseCore
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
+}
 
 @main
 struct climbingtracker99App: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     let modelContainer: ModelContainer
     
     init() {
         do {
+            let storeURL = URL.applicationSupportDirectory.appending(path: "climbingtracker99.store")
+            let storeDirectory = storeURL.deletingLastPathComponent()
+            do {
+                try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+            } catch {
+                print("Failed to create store directory: \(error.localizedDescription)")
+            }
+            
             let schema = Schema([
                 WeightEntry.self,
                 UserSettings.self,
@@ -34,15 +53,20 @@ struct climbingtracker99App: App {
                 PlannedBenchmark.self
             ])
             
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+            let modelConfiguration = ModelConfiguration(schema: schema,
+                                                        url: storeURL,
+                                                        allowsSave: true)
             
             do {
                 modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
             } catch {
                 // If we can't load the existing store, create a new one
                 print("Error loading store: \(error)")
-                let storeURL = URL.documentsDirectory.appending(path: "default.store")
                 try? FileManager.default.removeItem(at: storeURL)
+                let walURL = storeURL.appendingPathExtension("wal")
+                let shmURL = storeURL.appendingPathExtension("shm")
+                try? FileManager.default.removeItem(at: walURL)
+                try? FileManager.default.removeItem(at: shmURL)
                 modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
             }
             
@@ -200,6 +224,9 @@ struct climbingtracker99App: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    FirebaseSyncManager.shared.start(modelContainer: modelContainer)
+                }
         }
         .modelContainer(modelContainer)
     }

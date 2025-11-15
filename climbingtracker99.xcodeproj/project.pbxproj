@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4A0261292EBA2A280048C5F9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0261282EBA2A280048C5F9 /* FirebaseAnalytics */; };
+		4A02612B2EBA2A280048C5F9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4A02612A2EBA2A280048C5F9 /* FirebaseAuth */; };
+		4A02612D2EBA2A280048C5F9 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A02612C2EBA2A280048C5F9 /* FirebaseCore */; };
+		4A02612F2EBA2A280048C5F9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A02612E2EBA2A280048C5F9 /* FirebaseFirestore */; };
+		4A0261312EBA2A280048C5F9 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 4A0261302EBA2A280048C5F9 /* FirebaseStorage */; };
 		4ACADD712DB1AEDC0084939F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD702DB1AEDB0084939F /* WidgetKit.framework */; };
 		4ACADD732DB1AEDC0084939F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4ACADD722DB1AEDC0084939F /* SwiftUI.framework */; };
 		4ACADD842DB1AEDE0084939F /* ClimbingTrackerWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4ACADD6E2DB1AEDB0084939F /* ClimbingTrackerWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -112,7 +117,12 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4A0261292EBA2A280048C5F9 /* FirebaseAnalytics in Frameworks */,
+				4A02612B2EBA2A280048C5F9 /* FirebaseAuth in Frameworks */,
+				4A02612D2EBA2A280048C5F9 /* FirebaseCore in Frameworks */,
+				4A02612F2EBA2A280048C5F9 /* FirebaseFirestore in Frameworks */,
 				4ACADDDD2DB28CD60084939F /* SharedPackage in Frameworks */,
+				4A0261312EBA2A280048C5F9 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -198,6 +208,11 @@
 			name = climbingtracker99;
 			packageProductDependencies = (
 				4ACADDDC2DB28CD60084939F /* SharedPackage */,
+				4A0261282EBA2A280048C5F9 /* FirebaseAnalytics */,
+				4A02612A2EBA2A280048C5F9 /* FirebaseAuth */,
+				4A02612C2EBA2A280048C5F9 /* FirebaseCore */,
+				4A02612E2EBA2A280048C5F9 /* FirebaseFirestore */,
+				4A0261302EBA2A280048C5F9 /* FirebaseStorage */,
 			);
 			productName = climbingtracker99;
 			productReference = 4ACADD0E2DB17C4E0084939F /* climbingtracker99.app */;
@@ -308,6 +323,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4ACADDDB2DB28CD60084939F /* XCLocalSwiftPackageReference "SharedPackage" */,
+				4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4ACADD0F2DB17C4E0084939F /* Products */;
@@ -773,7 +789,43 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		4A0261282EBA2A280048C5F9 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		4A02612A2EBA2A280048C5F9 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		4A02612C2EBA2A280048C5F9 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		4A02612E2EBA2A280048C5F9 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		4A0261302EBA2A280048C5F9 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A0261272EBA2A280048C5F9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
 		4ACADDDC2DB28CD60084939F /* SharedPackage */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SharedPackage;
